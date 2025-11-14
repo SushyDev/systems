@@ -40,7 +40,13 @@
 	};
 
 	hardware = {
-		bluetooth.enable = true;
+		bluetooth = {
+			enable = true;
+			settings = {
+				General.Experimental = true;
+			};
+
+		};
 
 		nvidia = {
 			open = true;

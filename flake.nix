@@ -5,6 +5,7 @@
 		nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
 		determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/3.11.3";
 		chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable"; # IMPORTANT
+		plasma-manager.url = "github:nix-community/plasma-manager";
 
 		nix-darwin = {
 			url = "github:nix-darwin/nix-darwin/master";
@@ -36,7 +37,7 @@
 		};
 	};
 
-	outputs = { self, nixpkgs, determinate, chaotic, nix-darwin, home-manager, nix-plist-manager, ... }@inputs:
+	outputs = { self, nixpkgs, determinate, chaotic, plasma-manager, nix-darwin, home-manager, nix-plist-manager, ... }@inputs:
 		let
 			systemPc = {
 				system = "x86_64-linux";
@@ -44,9 +45,9 @@
 					inherit inputs;
 					setup = {
 						primaryUser = "sushy";
-						managedUsers = [ systemPc.setup.primaryUser ];
-						managedUsersAndRoot = [ "root" ] ++ systemPc.setup.managedUsers;
-						nixGroupMembers = [ systemPc.setup.primaryUser ];
+						managedUsers = [ systemPc.specialArgs.setup.primaryUser ];
+						managedUsersAndRoot = [ "root" ] ++ systemPc.specialArgs.setup.managedUsers;
+						nixGroupMembers = [ systemPc.specialArgs.setup.primaryUser ];
 						nixGroupName = "nix";
 						nixGroupId = 101;
 						systemFlakePath = "/etc/nixos";	

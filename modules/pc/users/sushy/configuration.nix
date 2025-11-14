@@ -2,12 +2,23 @@
 {
 	imports = [
 		inputs.dotfiles.homeManagerModules.default
+		# inputs.plasma-manager.homeModules.plasma-manager
 	];
 
 	dotfiles = {
 		enable = true;
 		systemFlakePath = setup.systemFlakePath;
 	};
+
+	# plasma = {
+	# 	enable = true;
+	# 	workspace.theme = "breeze-dark"; # Or another theme name like "breeze-light"
+	#
+	# 	lookAndFeel.name = "org.kde.breezedark.desktop";
+	# 	colorScheme.name = "BreezeDark";
+	# 	iconTheme.name = "breeze-dark";
+	# 	cursorTheme.name = "breeze_cursors";
+	# };
 
 	programs.git = {
 		settings.user.name = "SushyDev";
