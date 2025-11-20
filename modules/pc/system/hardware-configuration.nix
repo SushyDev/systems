@@ -12,7 +12,6 @@
 	boot.initrd.kernelModules = [ ];
 	boot.kernelModules = [ "kvm-intel" ];
 	boot.extraModulePackages = [ ];
-	boot.kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
 	boot.supportedFilesystems = [ "ntfs" ];
 
 	fileSystems."/" = {
