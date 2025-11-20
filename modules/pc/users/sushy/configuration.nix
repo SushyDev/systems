@@ -20,6 +20,14 @@
 	# 	cursorTheme.name = "breeze_cursors";
 	# };
 
+	programs.zsh = {
+		profileExtra = lib.mkBefore ''
+			if [ -z "$KDE_FULL_SESSION" ] && [ "$XDG_SESSION_TYPE" = "tty" ]; then
+				exec startplasma-wayland
+			fi
+		'';
+	};
+
 	programs.git = {
 		settings.user.name = "SushyDev";
 		settings.user.email = "mail@sushy.dev";

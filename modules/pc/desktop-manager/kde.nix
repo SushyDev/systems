@@ -7,9 +7,9 @@
 	services.upower.enable = true;
 	services.pipewire = {
 		enable = true;
-		alsa.enable = true;
-		alsa.support32Bit = true;
-		jack.enable = true; # Optional, only if you want JACK support
+		# alsa.enable = true;
+		# alsa.support32Bit = true;
+		# jack.enable = true; # Optional, only if you want JACK support
 		pulse.enable = true;
 	};
 

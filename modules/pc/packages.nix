@@ -21,17 +21,26 @@
 
 	nixpkgs.config.allowUnfree = true;
 
-	environment.systemPackages = [
-		pkgs.ghostty
-		pkgs.vivaldi
-		pkgs.discord
-		pkgs.spotify
-		pkgs.ddev
-		pkgs.mkcert
-		pkgs.xdg-utils
-		pkgs.dbeaver-bin
-		pkgs.php83
-	];
+	environment.systemPackages = 
+		let
+		in
+		[
+			# pkgs.opencode
+			# pkgs.qemu
+			# Comment out ntfs3g bc we have boot option supportedfilesystems = ntfs now
+			# pkgs.ntfs3g
+			pkgs.wl-clipboard-rs
+			pkgs.ghostty
+			pkgs.vivaldi
+			pkgs.discord
+			pkgs.spotify
+			pkgs.ddev
+			pkgs.mkcert
+			pkgs.xdg-utils
+			pkgs.dbeaver-bin
+			pkgs.php83
+			pkgs.gcc
+		];
 
 	fonts.packages = [
 		pkgs.fira-code
