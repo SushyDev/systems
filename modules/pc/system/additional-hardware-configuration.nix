@@ -1,6 +1,5 @@
 { pkgs, ... }:
 {
-
 	boot = {
 		loader = {
 			timeout = null;
@@ -25,6 +24,8 @@
 
 		tmp.cleanOnBoot = true;
 
+		kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
+
 		kernelParams = [
 			"pci=acpi"
 			"quiet"
@@ -48,6 +49,5 @@
 		graphics.enable = true;
 	};
 
-	nixpkgs.config.allowUnfree = true;
 	services.xserver.videoDrivers = [ "nvidia" ];
 }

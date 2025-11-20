@@ -19,10 +19,9 @@
 	# 	})
 	# ];
 
+	nixpkgs.config.allowUnfree = true;
+
 	environment.systemPackages = [
-		# pkgs.opencode
-		# pkgs.qemu
-		# pkgs.ntfs3g
 		pkgs.ghostty
 		pkgs.vivaldi
 		pkgs.discord

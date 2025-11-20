@@ -12,7 +12,6 @@
 	boot.initrd.kernelModules = [ ];
 	boot.kernelModules = [ "kvm-intel" ];
 	boot.extraModulePackages = [ ];
-	boot.kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
 
 	fileSystems."/" = {
 		device = "/dev/disk/by-uuid/5d009cb9-f6c0-4e28-b2e5-8d45ec9dbafb";

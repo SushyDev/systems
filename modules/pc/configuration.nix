@@ -9,7 +9,7 @@
 		./system/default.nix
 		../shared/oxidation.nix
 		./desktop-manager/kde.nix
-		# ./hardon.nix
+		# ./hardening.nix
 	];
 
 	nixpkgs.config.allowUnfree = true;
