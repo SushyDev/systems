@@ -32,7 +32,7 @@
 			pkgs.wl-clipboard-rs
 			pkgs.ghostty
 			pkgs.vivaldi
-			pkgs.discord
+			pkgs.discord-ptb
 			pkgs.spotify
 			pkgs.ddev
 			pkgs.mkcert
