@@ -29,7 +29,6 @@
 			# pkgs.qemu
 			# Comment out ntfs3g bc we have boot option supportedfilesystems = ntfs now
 			# pkgs.ntfs3g
-			pkgs.wl-clipboard-rs
 			pkgs.ghostty
 			pkgs.vivaldi
 			pkgs.discord-ptb
