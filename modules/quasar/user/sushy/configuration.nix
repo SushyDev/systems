@@ -30,7 +30,7 @@
 		pkgs.utm
 		pkgs.discord
 		pkgs.blender
-		pkgs.ollama
+		# pkgs.ollama
 	];
 
  	programs.git = {
