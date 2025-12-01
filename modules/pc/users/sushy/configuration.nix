@@ -1,4 +1,10 @@
-{ inputs, setup, lib, pkgs, ... }:
+{ 
+	inputs,
+	lib,
+	pkgs,
+	setup,
+	...
+}:
 {
 	imports = [
 		inputs.dotfiles.homeManagerModules.default

@@ -1,4 +1,4 @@
-{ pkgs, inputs, ... }: 
+{ ... }: 
 {
 	programs.nix-plist-manager = {
 		enable = true;

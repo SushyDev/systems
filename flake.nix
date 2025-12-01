@@ -6,6 +6,11 @@
 		determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
 		chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable"; # IMPORTANT
 
+		home-manager = {
+			url = "github:nix-community/home-manager/release-25.11";
+			inputs.nixpkgs.follows = "nixpkgs";
+		};
+
 		plasma-manager = {
 			url = "github:nix-community/plasma-manager";
 			inputs.nixpkgs.follows = "nixpkgs";
@@ -17,20 +22,15 @@
 			inputs.nixpkgs.follows = "nixpkgs";
 		};
 
-		home-manager = {
-			url = "github:nix-community/home-manager/release-25.11";
+		nix-darwin-apps = {
+			# url = "path:/Users/sushy/Documents/Projects/nix-darwin-apps";
+			url = "github:sushydev/nix-darwin-apps?ref=main";
 			inputs.nixpkgs.follows = "nixpkgs";
 		};
 
 		nix-plist-manager = {
 			# url = "path:/Users/sushy/Documents/Projects/nix-plist-manager-v2";
 			url = "github:sushydev/nix-plist-manager?ref=main";
-			inputs.nixpkgs.follows = "nixpkgs";
-		};
-
-		nix-darwin-apps = {
-			# url = "path:/Users/sushy/Documents/Projects/nix-darwin-apps";
-			url = "github:sushydev/nix-darwin-apps?ref=main";
 			inputs.nixpkgs.follows = "nixpkgs";
 		};
 
@@ -42,7 +42,7 @@
 		};
 	};
 
-	outputs = { self, nixpkgs, determinate, chaotic, plasma-manager, nix-darwin, home-manager, nix-plist-manager, ... }@inputs:
+	outputs = { self, nixpkgs, determinate, chaotic, home-manager, plasma-manager, nix-darwin, nix-plist-manager, ... }@inputs:
 		let
 			systemPc = {
 				system = "x86_64-linux";

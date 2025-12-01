@@ -1,4 +1,9 @@
-{ pkgs, base, inputs, ... }:
+{
+	base,
+	inputs,
+	pkgs, 
+	...
+}:
 {
 	imports = [
 		./darwin.nix
