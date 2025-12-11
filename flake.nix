@@ -3,8 +3,11 @@
 
 	inputs = {
 		nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-		determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
-		chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable"; # IMPORTANT
+
+		determinate = {
+			url = "github:determinatesystems/determinate/main";
+			inputs.nixpkgs.follows = "nixpkgs";
+		};
 
 		home-manager = {
 			url = "github:nix-community/home-manager/release-25.11";
@@ -42,7 +45,7 @@
 		};
 	};
 
-	outputs = { self, nixpkgs, determinate, chaotic, home-manager, plasma-manager, nix-darwin, nix-plist-manager, ... }@inputs:
+	outputs = { self, nixpkgs, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, ... }@inputs:
 		let
 			systemPc = {
 				system = "x86_64-linux";
@@ -60,7 +63,6 @@
 				};
 				modules = [
 					./modules/pc/configuration.nix
-					chaotic.nixosModules.default # IMPORTANT
 
 					home-manager.nixosModules.home-manager
 					./modules/pc/home-manager.nix
