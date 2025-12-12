@@ -228,11 +228,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1765441878,
-        "narHash": "sha256-XeOxy60X5R/I8dM/8KT47rwI2WFA71Jymqi9Kqmrszs=",
+        "lastModified": 1765533592,
+        "narHash": "sha256-jTvNX/2m3tM0U7R2OUCpVi+X9SeCpAvSGmXyzk/KROs=",
         "owner": "sushydev",
         "repo": "nix-darwin-apps",
-        "rev": "6632bb2ae2f021fe32edd250881a12e9140e35e7",
+        "rev": "63899bb7abc1e71824be5b57dd2539abdb0b6eff",
         "type": "github"
       },
       "original": {
@@ -250,11 +250,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1761409019,
-        "narHash": "sha256-SMKm7eh2H1o1KeJhIc4O+QSwR+KBjKgrW+jqL7lY9hI=",
+        "lastModified": 1765533928,
+        "narHash": "sha256-ZyfP9fpulv00Ca+AXpZ/QWf8HgGudWYhxUdBpNWCv0w=",
         "owner": "sushydev",
         "repo": "nix-plist-manager",
-        "rev": "ca7defcbc98c2b4fd0ebd166cc3e14cae40cbe73",
+        "rev": "c6824af7470182c73c900a750f443fa6ff15ea4f",
         "type": "github"
       },
       "original": {

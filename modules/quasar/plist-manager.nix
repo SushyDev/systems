@@ -1,5 +1,5 @@
 {
-	services.nix-plist-manager = {
+	programs.nix-plist-manager = {
 		enable = true;
 
 		options = {
