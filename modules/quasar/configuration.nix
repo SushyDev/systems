@@ -26,6 +26,7 @@
 		# pkgs.firefox
 		pkgs.obsidian
 		pkgs.ddev
+		pkgs.opencode
 
 		# My own overlay
 		# # pkgs.cloudflare-warp-gui
