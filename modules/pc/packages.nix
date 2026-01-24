@@ -39,6 +39,7 @@
 			pkgs.dbeaver-bin
 			pkgs.php83
 			pkgs.gcc
+			pkgs.i2c-tools
 		];
 
 	fonts.packages = [

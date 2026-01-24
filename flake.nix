@@ -1,5 +1,5 @@
 {
-	description = "A very basic flake";
+	description = "My systems";
 
 	inputs = {
 		nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -42,6 +42,11 @@
 			type = "git";
 			url = "https://github.com/sushydev/dotfiles";
 			submodules = true;
+		};
+
+		sushy-lib = {
+			url = "github:sushydev/nix-lib";
+			inputs.nixpkgs.follows = "nixpkgs";
 		};
 	};
 

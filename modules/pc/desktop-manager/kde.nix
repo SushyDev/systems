@@ -19,11 +19,12 @@
 		# pkgs.kdePackages.plasma-browser-integration
 		pkgs.kdePackages.plasma-pa
 		# pkgs.kdePackages.systemsettings
+		pkgs.kdePackages.calligra
 	];
 
 	environment.plasma6.excludePackages = [
 		pkgs.kdePackages.elisa
-		pkgs.kdePackages.kate
+		# pkgs.kdePackages.kate
 		pkgs.kdePackages.oxygen
 		pkgs.kdePackages.okular
 		pkgs.kdePackages.khelpcenter

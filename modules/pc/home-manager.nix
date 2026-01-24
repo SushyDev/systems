@@ -7,4 +7,6 @@
 	};
 
 	home-manager.users.sushy = import ./users/sushy/configuration.nix;
+
+	services.emacs.enable = true;
 }

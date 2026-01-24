@@ -34,12 +34,16 @@
 			"systemd.show_status=auto"
 			"rd.udev.log_level=3"
 		];
+
 		blacklistedKernelModules = [ "nouveau" ];
-		# kernelPackages = pkgs.linuxPackages_latest;
-		kernelPackages = pkgs.linuxPackages_cachyos;
+
+		kernelPackages = pkgs.linuxPackages_latest;
+		# kernelPackages = pkgs.linuxPackages_cachyos;
 	};
 
 	hardware = {
+		i2c.enable = true;
+
 		bluetooth = {
 			enable = true;
 			settings = {
@@ -51,7 +55,18 @@
 		nvidia = {
 			open = true;
 			modesetting.enable = true;
+
+			# THIS is the specific fix for the sleep/wake issue.
+			# It enables the nvidia-suspend/resume/hibernate systemd services
+			# and sets NVreg_PreserveVideoMemoryAllocations=1 automatically.
+			powerManagement.enable = true;
+
+			# Keep this false unless you are on a laptop with a very new GPU (Turing+)
+			# and specifically want the GPU to turn off completely when not in use.
+			# For sleep stability, false is often safer.
+			powerManagement.finegrained = false;
 		};
+
 		graphics.enable = true;
 	};
 
