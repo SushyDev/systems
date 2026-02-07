@@ -1,5 +1,5 @@
 # Hardware configuration for pulsar server
-{ lib, ... }:
+{ lib, pkgs, ... }:
 {
 	boot.initrd.availableKernelModules = [ "vmd" "xhci_pci" "ahci" "nvme" "usbhid" ];
 	boot.initrd.kernelModules = [ ];
@@ -24,10 +24,10 @@
 
 		serviceConfig.Type = "oneshot";
 
-		path = with (import <nixpkgs> { }); [ coreutils util-linux rsync ];
+		path = with pkgs; [ coreutils util-linux rsync ];
 
 		script = ''
-			#!${(import <nixpkgs> { }).bash}/bin/bash
+			#!${pkgs.bash}/bin/bash
 			set -euo pipefail
 
 			BACKUP_ESP_DEVICE="/dev/disk/by-partlabel/ESP-BACKUP"
@@ -62,10 +62,10 @@
 		requires = [ "sys-firmware-efi-efivars.mount" ];
 		after = [ "sys-firmware-efi-efivars.mount" ];
 
-		path = with (import <nixpkgs> { }); [ coreutils efibootmgr gnugrep util-linux ];
+		path = with pkgs; [ coreutils efibootmgr gnugrep util-linux ];
 
 		script = ''
-			#!${(import <nixpkgs> { }).bash}/bin/bash
+			#!${pkgs.bash}/bin/bash
 			set -euo pipefail
 
 			if ! efibootmgr | grep -q "NixOS (Backup)"; then
