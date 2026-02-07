@@ -74,34 +74,57 @@
 				];
 			};
 
-			systemQuasar = {
-				system = "aarch64-darwin";
-				specialArgs = {
-					inherit inputs;
-					setup = {
-						managedUsers = [ "sushy" "work" ];
-						managedUsersAndRoot = systemQuasar.specialArgs.setup.managedUsers ++ [ "root" ];
-						nixGroupName = "nix";
-						nixGroupId = 503;
-						systemFlakePath = "/private/etc/nixdarwin";
-					};
+		systemQuasar = {
+			system = "aarch64-darwin";
+			specialArgs = {
+				inherit inputs;
+				setup = {
+					managedUsers = [ "sushy" "work" ];
+					managedUsersAndRoot = systemQuasar.specialArgs.setup.managedUsers ++ [ "root" ];
+					nixGroupName = "nix";
+					nixGroupId = 503;
+					systemFlakePath = "/private/etc/nixdarwin";
 				};
-				modules = [
-					./modules/quasar/configuration.nix
-
-					determinate.darwinModules.default
-					./modules/quasar/determinate.nix
-
-					nix-plist-manager.darwinModules.default
-					./modules/quasar/plist-manager.nix
-
-					home-manager.darwinModules.home-manager
-					./modules/quasar/home-manager.nix
-				];
 			};
-		in
-		{
-			nixosConfigurations.pc = nixpkgs.lib.nixosSystem systemPc;
-			darwinConfigurations.quasar = nix-darwin.lib.darwinSystem systemQuasar;
+			modules = [
+				./modules/quasar/configuration.nix
+
+				determinate.darwinModules.default
+				./modules/quasar/determinate.nix
+
+				nix-plist-manager.darwinModules.default
+				./modules/quasar/plist-manager.nix
+
+				home-manager.darwinModules.home-manager
+				./modules/quasar/home-manager.nix
+			];
 		};
+
+		systemPulsar = {
+			system = "x86_64-linux";
+			specialArgs = {
+				inherit inputs;
+				setup = {
+					primaryUser = "sushy";
+					managedUsers = [ systemPulsar.specialArgs.setup.primaryUser ];
+					managedUsersAndRoot = [ "root" ] ++ systemPulsar.specialArgs.setup.managedUsers;
+					nixGroupMembers = [ systemPulsar.specialArgs.setup.primaryUser ];
+					nixGroupName = "nix";
+					nixGroupId = 101;
+					systemFlakePath = "/etc/nixos";	
+				};
+			};
+			modules = [
+				./modules/pulsar/configuration.nix
+
+				home-manager.nixosModules.home-manager
+				./modules/pulsar/home-manager.nix
+			];
+		};
+	in
+	{
+		nixosConfigurations.pc = nixpkgs.lib.nixosSystem systemPc;
+		darwinConfigurations.quasar = nix-darwin.lib.darwinSystem systemQuasar;
+		nixosConfigurations.pulsar = nixpkgs.lib.nixosSystem systemPulsar;
+	};
 }
