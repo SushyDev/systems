@@ -61,6 +61,26 @@
         "url": "https://install.determinate.systems/determinate-nixd/tag/v3.15.2/x86_64-linux"
       }
     },
+    "disko": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1769524058,
+        "narHash": "sha256-zygdD6X1PcVNR2PsyK4ptzrVEiAdbMqLos7utrMDEWE=",
+        "owner": "nix-community",
+        "repo": "disko",
+        "rev": "71a3fc97d80881e91710fe721f1158d3b96ae14d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "disko",
+        "type": "github"
+      }
+    },
     "dotfiles": {
       "locked": {
         "lastModified": 1765543057,
@@ -367,6 +387,7 @@
     "root": {
       "inputs": {
         "determinate": "determinate",
+        "disko": "disko",
         "dotfiles": "dotfiles",
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",

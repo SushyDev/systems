@@ -4,6 +4,11 @@
 	inputs = {
 		nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
+		disko = {
+			url = "github:nix-community/disko";
+			inputs.nixpkgs.follows = "nixpkgs";
+		};
+
 		determinate = {
 			url = "github:determinatesystems/determinate/main";
 			inputs.nixpkgs.follows = "nixpkgs";
@@ -50,7 +55,7 @@
 		};
 	};
 
-	outputs = { self, nixpkgs, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, ... }@inputs:
+	outputs = { self, nixpkgs, disko, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, ... }@inputs:
 		let
 			systemPc = {
 				system = "x86_64-linux";
@@ -104,6 +109,7 @@
 			system = "x86_64-linux";
 			specialArgs = {
 				inherit inputs;
+				disko = disko;
 				setup = {
 					primaryUser = "sushy";
 					managedUsers = [ systemPulsar.specialArgs.setup.primaryUser ];
@@ -115,6 +121,9 @@
 				};
 			};
 			modules = [
+				disko.nixosModules.disko
+				./modules/pulsar/disko/btrfs-raid1.nix
+
 				./modules/pulsar/configuration.nix
 
 				home-manager.nixosModules.home-manager
