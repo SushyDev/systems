@@ -8,7 +8,6 @@
 		./services.nix
 
 		./system/default.nix
-		./system/nix.nix
 		../shared/oxidation.nix
 	];
 

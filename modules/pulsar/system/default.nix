@@ -1,6 +1,7 @@
 { setup, ... }:
 {
 	imports = [ 
+		./nix.nix
 		./users-and-groups.nix
 		./hardware-configuration.nix
 	];
@@ -13,3 +14,4 @@
 		'';
 	};
 }
+
