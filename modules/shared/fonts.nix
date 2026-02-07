@@ -5,19 +5,18 @@
 			pkgs.noto-fonts
 			pkgs.noto-fonts-cjk-serif
 			pkgs.noto-fonts-cjk-sans
-			pkgs.noto-fonts-emoji
-			pkgs.noto-fonts-extra
+			pkgs.twitter-color-emoji
 		];
 
 		fontconfig = {
 			enable = true;
 
-			defaultFonts = {
-				monospace = [ "Fira Code" "Noto Color Emoji" ];
-				sansSerif = [ "DejaVu Sans" "Noto Color Emoji" ];
-				serif = [ "DejaVu Serif" "Noto Color Emoji" ];
-				emoji = [ "Noto Color Emoji" ];
-			};
+		defaultFonts = {
+			monospace = [ "Twitter Color Emoji" "Fira Code" ];
+			sansSerif = [ "Twitter Color Emoji" "DejaVu Sans" ];
+			serif = [ "Twitter Color Emoji" "DejaVu Serif" ];
+			emoji = [ "Twitter Color Emoji" ];
+		};
 		};
 	};
 }
