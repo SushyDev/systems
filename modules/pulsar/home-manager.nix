@@ -11,7 +11,7 @@
 
 		programs.git = {
 			enable = true;
-			extraConfig = {
+			settings = {
 				safe.directory = setup.systemFlakePath;
 			};
 		};
