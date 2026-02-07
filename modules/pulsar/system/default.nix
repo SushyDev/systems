@@ -1,4 +1,4 @@
-{ setup, ... }:
+{ setup, pkgs, ... }:
 {
 	imports = [ 
 		./users-and-groups.nix
@@ -12,7 +12,7 @@
 			chmod -R g+rwX ${setup.systemFlakePath}
 			
 			# Configure git to trust the flake directory
-			git config --global --add safe.directory ${setup.systemFlakePath}
+			${pkgs.git}/bin/git config --global --add safe.directory ${setup.systemFlakePath}
 		'';
 	};
 }
