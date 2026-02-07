@@ -1,7 +1,4 @@
 { ... }:
 {
-	nix.settings.experimental-features = [ "nix-command" "flakes" ];
-	nix.channel.enable = true;
-
-	nixpkgs.config.allowUnfree = true;
+	# Nix configuration is handled in the main configuration.nix
 }

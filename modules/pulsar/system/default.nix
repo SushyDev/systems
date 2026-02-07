@@ -1,10 +1,7 @@
 { setup, ... }:
 {
 	imports = [ 
-		./nix.nix
-		./networking.nix
 		./users-and-groups.nix
-
 		./hardware-configuration.nix
 	];
 
