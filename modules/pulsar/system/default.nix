@@ -12,7 +12,7 @@
 			chmod -R g+rwX ${setup.systemFlakePath}
 			
 			# Configure git to trust the flake directory
-			export HOME=/root
+			export HOME=/home/sushy
 			${pkgs.git}/bin/git config --global --add safe.directory ${setup.systemFlakePath}
 		'';
 	};
