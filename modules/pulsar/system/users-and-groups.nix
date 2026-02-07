@@ -1,12 +1,16 @@
-{ ... }:
+{ setup, ... }:
 {
+	users.groups.nix = {
+		gid = setup.nixGroupId;
+	};
+
 	users.groups.media = {
 		gid = 1000; # Using a GID that won't conflict
 	};
 
 	users.users.sushy = {
 		isNormalUser = true;
-		extraGroups = [ "wheel" "docker" "media" ];
+		extraGroups = [ "wheel" "docker" "media" "nix" ];
 	};
 
 	# --- SSH
