@@ -1,4 +1,4 @@
-{ setup, pkgs, ... }:
+{ setup, ... }:
 {
 	imports = [ 
 		./users-and-groups.nix
@@ -10,10 +10,6 @@
 			mkdir -p ${setup.systemFlakePath}
 			chown -R root:nix ${setup.systemFlakePath}
 			chmod -R g+rwX ${setup.systemFlakePath}
-			
-			# Configure git to trust the flake directory
-			export HOME=/home/sushy
-			${pkgs.git}/bin/git config --global --add safe.directory ${setup.systemFlakePath}
 		'';
 	};
 }

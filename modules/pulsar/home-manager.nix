@@ -8,5 +8,12 @@
 		];
 
 		programs.bash.enable = true;
+
+		programs.git = {
+			enable = true;
+			extraConfig = {
+				safe.directory = setup.systemFlakePath;
+			};
+		};
 	};
 }
