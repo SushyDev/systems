@@ -8,6 +8,7 @@
 		./services.nix
 
 		./system/default.nix
+		./system/nix.nix
 		../shared/oxidation.nix
 	];
 
@@ -19,11 +20,6 @@
 
 	# --- Networking
 	networking.hostName = "pulsar";
-
-	# --- Nix Config
-	nix.settings.experimental-features = [ "nix-command" "flakes" ];
-	nix.channel.enable = true;
-	#nix.nixPath = ["nixpkgs=${nixpkgs.url}"];
 
 	nixpkgs.config.allowUnfree = true;
 
