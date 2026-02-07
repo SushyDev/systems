@@ -25,7 +25,7 @@
 		let
 		in
 		[
-			# pkgs.opencode
+			pkgs.opencode
 			# pkgs.qemu
 			# Comment out ntfs3g bc we have boot option supportedfilesystems = ntfs now
 			# pkgs.ntfs3g
