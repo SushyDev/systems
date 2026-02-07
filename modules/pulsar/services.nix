@@ -3,7 +3,24 @@
 	# --- SSH
 	services.openssh.enable = true;
 	services.openssh.ports = [ 22 ];
-	services.openssh.settings.PasswordAuthentication = false;
+	
+	# Security settings
+	services.openssh.settings = {
+		# Disable password authentication
+		PasswordAuthentication = false;
+		
+		# Disable root login
+		PermitRootLogin = "no";
+		
+		# Only allow key-based authentication
+		PubkeyAuthentication = true;
+		
+		# Disable empty password login
+		PermitEmptyPasswords = false;
+		
+		# Restrict authentication methods
+		AuthenticationMethods = "publickey";
+	};
 
 	# --- Virtualisation
 	virtualisation.docker.enable = true;
