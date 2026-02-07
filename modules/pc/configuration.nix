@@ -8,6 +8,7 @@
 
 		./system/default.nix
 		../shared/oxidation.nix
+		../shared/fonts.nix
 		./desktop-manager/kde.nix
 		# ./hardening.nix
 	];
