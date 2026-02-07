@@ -57,27 +57,28 @@
 
 	outputs = { self, nixpkgs, disko, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, ... }@inputs:
 		let
-			systemPc = {
-				system = "x86_64-linux";
-				specialArgs = {
-					inherit inputs;
-					setup = {
-						primaryUser = "sushy";
-						managedUsers = [ systemPc.specialArgs.setup.primaryUser ];
-						managedUsersAndRoot = [ "root" ] ++ systemPc.specialArgs.setup.managedUsers;
-						nixGroupMembers = [ systemPc.specialArgs.setup.primaryUser ];
-						nixGroupName = "nix";
-						nixGroupId = 101;
-						systemFlakePath = "/etc/nixos";	
-					};
+		systemPc = {
+			system = "x86_64-linux";
+			specialArgs = {
+				inherit inputs;
+				setup = {
+					primaryUser = "sushy";
+					managedUsers = [ systemPc.specialArgs.setup.primaryUser ];
+					managedUsersAndRoot = [ "root" ] ++ systemPc.specialArgs.setup.managedUsers;
+					nixGroupMembers = [ systemPc.specialArgs.setup.primaryUser ];
+					nixGroupName = "nix";
+					nixGroupId = 101;
+					systemFlakePath = "/etc/nixos";	
 				};
-				modules = [
-					./modules/pc/configuration.nix
-
-					home-manager.nixosModules.home-manager
-					./modules/pc/home-manager.nix
-				];
 			};
+			modules = [
+				determinate.nixosModules.default
+				./modules/pc/configuration.nix
+
+				home-manager.nixosModules.home-manager
+				./modules/pc/home-manager.nix
+			];
+		};
 
 		systemQuasar = {
 			system = "aarch64-darwin";
@@ -121,6 +122,7 @@
 				};
 			};
 			modules = [
+				determinate.nixosModules.default
 				disko.nixosModules.disko
 				./modules/pulsar/disko/btrfs-raid1.nix
 
