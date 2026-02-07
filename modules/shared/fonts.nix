@@ -1,12 +1,12 @@
 { pkgs, ... }:
 {
 	fonts = {
-		packages = with pkgs; [
-			noto-fonts
-			noto-fonts-cjk-serif
-			noto-fonts-cjk-sans
-			noto-fonts-emoji
-			noto-fonts-extra
+		packages = [
+			pkgs.noto-fonts
+			pkgs.noto-fonts-cjk-serif
+			pkgs.noto-fonts-cjk-sans
+			pkgs.noto-fonts-emoji
+			pkgs.noto-fonts-extra
 		];
 
 		fontconfig = {
