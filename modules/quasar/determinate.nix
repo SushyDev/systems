@@ -1,8 +1,8 @@
-{ self, nixpkgs, determinate-nix, setup, ... }:
+{ self, nixpkgs, determinateNix, setup, ... }:
 {
 	nix.enable = false;
 
-	determinate-nix.customSettings = {
+	determinateNix.customSettings = {
 		experimental-features = "nix-command flakes external-builders";
 		trusted-users = setup.managedUsersAndRoot;
 		lazy-trees = true;
