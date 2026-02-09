@@ -68,10 +68,22 @@ mkmr() {
 }
 	'';
 
+	programs.ssh = {
+		includes = [
+			"${config.xdg.configHome}/ssh/1password_servers_config"
+		];
+	};
+
 	home.packages = [ 
 		pkgs.slack
 		pkgs.phpstorm
 		pkgs.glab
+
+		# K8S
+		pkgs.terraform
+		pkgs.packer
+		pkgs.hcloud
+		pkgs.talosctl
 	];
 
 	programs.direnv = {
