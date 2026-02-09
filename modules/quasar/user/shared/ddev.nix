@@ -16,10 +16,8 @@ lib.mkIf hasDdev
 		executable = true;
 	};
 
-	# Add activation script to rebuild ddev global commands after files are written
 	home.activation.ddevFixCommands = lib.hm.dag.entryAfter ["writeBoundary"] ''
-		if command -v ddev &> /dev/null; then
-			$DRY_RUN_CMD ddev utility fix-commands || true
-		fi
+		command -v ddev &>/dev/null || exit 0
+		$DRY_RUN_CMD ddev utility fix-commands || true
 	'';
 }
