@@ -33,12 +33,16 @@
 			"udev.log_level=3"
 			"systemd.show_status=auto"
 			"rd.udev.log_level=3"
+			"acpi_osi=Windows"
 		];
 
 		blacklistedKernelModules = [ "nouveau" ];
 
 		kernelPackages = pkgs.linuxPackages_latest;
 		# kernelPackages = pkgs.linuxPackages_cachyos;
+
+		# Enable Bluetooth ISO Socket for audio profile (BAP)
+		kernelModules = [ "bnep" "iso_socket" ];
 	};
 
 	hardware = {

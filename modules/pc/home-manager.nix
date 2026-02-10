@@ -8,5 +8,7 @@
 
 	home-manager.users.sushy = import ./users/sushy/configuration.nix;
 
-	services.emacs.enable = true;
+	# Emacs is managed as a user service via home-manager, not system-wide
+	# This avoids startup failures and allows per-user configuration
+	services.emacs.enable = false;
 }

@@ -33,11 +33,4 @@
 	services.blueman.enable = false;
 	systemd.services.systemd-udev-settle.enable = false;
 	systemd.services.NetworkManager-wait-online.enable = false;
-
-	services.emacs = {
-		enable             = true;
-		package            = pkgs.emacs;
-		defaultEditor      = true;
-		startWithGraphical = true;
-	};
 }

@@ -12,9 +12,9 @@
 			enable = true;
 
 		defaultFonts = {
-			monospace = [ "Twitter Color Emoji" "Fira Code" ];
-			sansSerif = [ "Twitter Color Emoji" "DejaVu Sans" ];
-			serif = [ "Twitter Color Emoji" "DejaVu Serif" ];
+			monospace = [ "Fira Code" "Twitter Color Emoji" ];
+			sansSerif = [ "DejaVu Sans" "Twitter Color Emoji" ];
+			serif = [ "DejaVu Serif" "Twitter Color Emoji" ];
 			emoji = [ "Twitter Color Emoji" ];
 		};
 		};
