@@ -17,16 +17,14 @@
 	# $ nix-env -qaP | grep wget
 	environment.systemPackages = [
 		pkgs.opencode
-		# pkgs.qemu
 		pkgs.openssh
-		# pkgs.stow
 		pkgs._1password-gui-beta
 		pkgs._1password-cli
 		pkgs.raycast
-		# pkgs.firefox
 		pkgs.obsidian
 		pkgs.ddev
 		pkgs.opencode
+		pkgs.aerospace
 
 		# My own overlay
 		# # pkgs.cloudflare-warp-gui

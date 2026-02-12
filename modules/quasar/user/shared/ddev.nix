@@ -10,10 +10,12 @@ lib.mkIf hasDdev
 	home.file.".ddev/commands/web/autocomplete/artisan" = {
 		source = ./ddev/artisan.sh;
 		executable = true;
+		force = true;
 	};
 	home.file.".ddev/commands/web/autocomplete/magento" = {
 		source = ./ddev/magento.sh;
 		executable = true;
+		force = true;
 	};
 
 	home.activation.ddevFixCommands = lib.hm.dag.entryAfter ["writeBoundary"] ''
