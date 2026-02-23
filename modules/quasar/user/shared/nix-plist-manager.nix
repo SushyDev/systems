@@ -45,7 +45,7 @@
 						# 	spotlight = false;
 						# 	siri = false;
 						# };
-						# automaticallyHideAndShowTheMenuBar = "In Full Screen Only";
+						# automaticallyHideAndShowTheMenuBar = "Always";
 					};
 
 					appearance = {
