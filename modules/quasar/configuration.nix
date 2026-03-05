@@ -18,7 +18,7 @@
 	environment.systemPackages = [
 		pkgs.opencode
 		pkgs.openssh
-		pkgs._1password-gui-beta
+		pkgs._1password-gui
 		pkgs._1password-cli
 		pkgs.raycast
 		pkgs.obsidian

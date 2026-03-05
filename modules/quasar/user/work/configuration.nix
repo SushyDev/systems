@@ -83,9 +83,10 @@
 			glab mr create \
 				-y \
 				--fill \
+				--squash-before-merge \
 				-b "$branch_name" \
 				-t "$(_glab_mr_title)" \
-				-a "kjel"
+				-a "$GITLAB_USERNAME"
 		}
 	'';
 }
