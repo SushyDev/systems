@@ -40,6 +40,7 @@
 			pkgs.php83
 			pkgs.gcc
 			pkgs.i2c-tools
+            pkgs.rustup
 		];
 
 	fonts.packages = [

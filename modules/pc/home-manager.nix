@@ -10,5 +10,5 @@
 
 	# Emacs is managed as a user service via home-manager, not system-wide
 	# This avoids startup failures and allows per-user configuration
-	services.emacs.enable = false;
+	services.emacs.enable = true;
 }
