@@ -39,17 +39,27 @@
 		pkgs.phpstorm
 		pkgs.glab
 		pkgs.mongodb-compass
+		pkgs.postman
 
 		# K8S
 		pkgs.terraform
 		pkgs.packer
 		pkgs.hcloud
 		pkgs.talosctl
+		# pkgs.helm
+		pkgs.fluxcd
+		# pkgs.kubectl
+		pkgs.sops
+		pkgs.age
+		pkgs.yq
 	];
 
 	programs.zsh.initContent = ''
 		EDITOR=nvim
-		PROJECTS=($HOME/Documents/projects)
+		PROJECTS=(
+			$HOME/Documents/projects
+			$HOME/Documents/projects/connectors
+		)
 
 		PATH=$PATH:$HOME/Documents/nix/opdb/result/bin
 
