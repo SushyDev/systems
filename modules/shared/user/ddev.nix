@@ -7,16 +7,12 @@ lib.mkIf hasDdev {
 		mkdir -p ${config.home.homeDirectory}/.ddev/commands/web/autocomplete
 	'';
 
-	home.file.".ddev/commands/web/autocomplete/artisan" = {
-		source = ./ddev/artisan.sh;
-		executable = true;
-		force = true;
-	};
-	home.file.".ddev/commands/web/autocomplete/magento" = {
-		source = ./ddev/magento.sh;
-		executable = true;
-		force = true;
-	};
+	home.activation.ddevCopyAutocompletScripts = lib.hm.dag.entryAfter ["writeBoundary"] ''
+		cp -f ${./ddev/artisan.sh} ${config.home.homeDirectory}/.ddev/commands/web/autocomplete/artisan
+		chmod +x ${config.home.homeDirectory}/.ddev/commands/web/autocomplete/artisan
+		cp -f ${./ddev/magento.sh} ${config.home.homeDirectory}/.ddev/commands/web/autocomplete/magento
+		chmod +x ${config.home.homeDirectory}/.ddev/commands/web/autocomplete/magento
+	'';
 
 	home.activation.ddevFixCommands = lib.hm.dag.entryAfter ["writeBoundary"] ''
 		if command -v ddev &>/dev/null; then
