@@ -15,5 +15,8 @@
 				safe.directory = setup.systemFlakePath;
 			};
 		};
+
+		# BuildX Patch until DDEV fixes their buildx plugin detection
+		home.file.".docker/cli-plugins/docker-buildx".source = "${pkgs.docker-buildx}/libexec/docker/cli-plugins/docker-buildx";
 	};
 }

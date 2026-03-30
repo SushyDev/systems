@@ -41,8 +41,7 @@
 		kernelPackages = pkgs.linuxPackages_latest;
 		# kernelPackages = pkgs.linuxPackages_cachyos;
 
-		# Enable Bluetooth ISO Socket for audio profile (BAP)
-		kernelModules = [ "bnep" "iso_socket" ];
+		kernelModules = [ "bnep" "nvidia_uvm" ];
 	};
 
 	hardware = {
@@ -72,6 +71,12 @@
 		};
 
 		graphics.enable = true;
+		graphics.extraPackages = [ pkgs.nvidia-vaapi-driver ];
+	};
+
+	environment.sessionVariables = {
+		LIBVA_DRIVER_NAME = "nvidia";
+		NVD_BACKEND = "direct";
 	};
 
 	services.xserver.videoDrivers = [ "nvidia" ];
