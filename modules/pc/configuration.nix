@@ -13,6 +13,8 @@
 		# ./hardening.nix
 	];
 
+	nix.settings.trusted-users = [ "sushy" ];
+
 	i18n.defaultLocale = "en_US.UTF-8";
 	console.earlySetup = true;
 	time.timeZone = "Europe/Amsterdam";
@@ -22,4 +24,7 @@
 		pbcopy = "wl-copy";
 		pbpaste = "wl-paste";
 	};
+
+	# Magento 2 NixOS OCI Stack
+	services.m2-nix.enable = true;
 }

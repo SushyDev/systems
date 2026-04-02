@@ -54,9 +54,14 @@
 			url = "github:sushydev/nix-lib";
 			inputs.nixpkgs.follows = "nixpkgs";
 		};
+
+		m2-nix = {
+			url = "path:/home/sushy/Documents/Projects/m2-nix";
+			inputs.nixpkgs.follows = "nixpkgs";
+		};
 	};
 
-	outputs = { self, nixpkgs, disko, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, ... }@inputs:
+	outputs = { self, nixpkgs, disko, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, m2-nix, ... }@inputs:
 		let
 			systemPc = {
 				system = "x86_64-linux";
@@ -74,6 +79,7 @@
 				};
 				modules = [
 					determinate.nixosModules.default
+					m2-nix.nixosModules.default
 					./modules/pc/configuration.nix
 
 					home-manager.nixosModules.home-manager
