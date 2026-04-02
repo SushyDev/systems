@@ -50,18 +50,13 @@
 			submodules = true;
 		};
 
-	sushy-lib = {
-		url = "github:sushydev/nix-lib";
-		inputs.nixpkgs.follows = "nixpkgs";
+		sushy-lib = {
+			url = "github:sushydev/nix-lib";
+			inputs.nixpkgs.follows = "nixpkgs";
+		};
 	};
 
-	arion = {
-		url = "github:hercules-ci/arion";
-		inputs.nixpkgs.follows = "nixpkgs";
-	};
-	};
-
-	outputs = { self, nixpkgs, disko, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, arion, ... }@inputs:
+	outputs = { self, nixpkgs, disko, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, ... }@inputs:
 		let
 			systemPc = {
 				system = "x86_64-linux";

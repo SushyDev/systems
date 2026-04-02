@@ -6,18 +6,20 @@
 # Then restart your ddev projects
 
 # check if we are in a magento project by looking for bin/magento
-if [ ! -f bin/magento ]; then
-	exit 0
-fi
-# load bash completion for magento if it is not declared
+[[ -f bin/magento ]] || exit 0
+
+# source bash_completion if not already loaded, then eval the magento completion script
 if ! declare -F _sf_magento >/dev/null; then
-	source /etc/bash_completion
-	eval $(php bin/magento completion bash)
+  source /etc/bash_completion
+  eval "$(php bin/magento completion bash)"
 fi
+
 # set env variables required for magento's bash completion script
-COMP_WORDS=("$@")
-COMP_CWORD=$(($# - 1))
+readonly COMP_WORDS=("$@")
+readonly COMP_CWORD=$(($# - 1))
+
 # run the actual script
 _sf_magento
+
 # output the result (which was stored in COMPREPLY) as a new-line delimited string
 printf "%s\n" "${COMPREPLY[@]}"
