@@ -24,7 +24,4 @@
 		pbcopy = "wl-copy";
 		pbpaste = "wl-paste";
 	};
-
-	# Magento 2 NixOS OCI Stack
-	services.m2-nix.enable = true;
 }

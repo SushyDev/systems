@@ -50,18 +50,18 @@
 			submodules = true;
 		};
 
-		sushy-lib = {
-			url = "github:sushydev/nix-lib";
-			inputs.nixpkgs.follows = "nixpkgs";
-		};
-
-		m2-nix = {
-			url = "path:/home/sushy/Documents/Projects/m2-nix";
-			inputs.nixpkgs.follows = "nixpkgs";
-		};
+	sushy-lib = {
+		url = "github:sushydev/nix-lib";
+		inputs.nixpkgs.follows = "nixpkgs";
 	};
 
-	outputs = { self, nixpkgs, disko, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, m2-nix, ... }@inputs:
+	arion = {
+		url = "github:hercules-ci/arion";
+		inputs.nixpkgs.follows = "nixpkgs";
+	};
+	};
+
+	outputs = { self, nixpkgs, disko, determinate, home-manager, plasma-manager, nix-darwin, nix-plist-manager, arion, ... }@inputs:
 		let
 			systemPc = {
 				system = "x86_64-linux";
@@ -77,14 +77,13 @@
 						systemFlakePath = "/etc/nixos";	
 					};
 				};
-				modules = [
-					determinate.nixosModules.default
-					m2-nix.nixosModules.default
-					./modules/pc/configuration.nix
+			modules = [
+				determinate.nixosModules.default
+				./modules/pc/configuration.nix
 
-					home-manager.nixosModules.home-manager
-					./modules/pc/home-manager.nix
-				];
+				home-manager.nixosModules.home-manager
+				./modules/pc/home-manager.nix
+			];
 			};
 
 			systemQuasar = {
