@@ -17,21 +17,21 @@
   };
 
   # plasma = {
-  # 	enable = true;
-  # 	workspace.theme = "breeze-dark"; # Or another theme name like "breeze-light"
+  #   enable = true;
+  #   workspace.theme = "breeze-dark"; # Or another theme name like "breeze-light"
   #
-  # 	lookAndFeel.name = "org.kde.breezedark.desktop";
-  # 	colorScheme.name = "BreezeDark";
-  # 	iconTheme.name = "breeze-dark";
-  # 	cursorTheme.name = "breeze_cursors";
+  #   lookAndFeel.name = "org.kde.breezedark.desktop";
+  #   colorScheme.name = "BreezeDark";
+  #   iconTheme.name = "breeze-dark";
+  #   cursorTheme.name = "breeze_cursors";
   # };
 
   # programs.zsh = {
-  # 	profileExtra = lib.mkBefore ''
-  # 		if [ -z "$KDE_FULL_SESSION" ] && [ "$XDG_SESSION_TYPE" = "tty" ]; then
-  # 			exec startplasma-wayland
-  # 		fi
-  # 	'';
+  #   profileExtra = lib.mkBefore ''
+  #     if [ -z "$KDE_FULL_SESSION" ] && [ "$XDG_SESSION_TYPE" = "tty" ]; then
+  #       exec startplasma-wayland
+  #     fi
+  #   '';
   # };
 
   programs.git = {

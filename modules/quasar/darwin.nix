@@ -38,10 +38,10 @@ in
   # Setup basic nix conveniences
 
   system.activationScripts.extraActivation.text = lib.mkAfter ''
-    		/bin/mkdir -p ${setup.systemFlakePath}
-    		/usr/sbin/chown -R root:nix ${setup.systemFlakePath}
-    		/bin/chmod -R g+rwX ${setup.systemFlakePath}
-    	'';
+    /bin/mkdir -p ${setup.systemFlakePath}
+    /usr/sbin/chown -R root:nix ${setup.systemFlakePath}
+    /bin/chmod -R g+rwX ${setup.systemFlakePath}
+  '';
 
   environment.shellAliases = {
     darwin-switch = "/usr/bin/sudo ${lib.getExe pkgs.nix} run nix-darwin/master#darwin-rebuild -- switch --flake ${setup.systemFlakePath}";
@@ -49,9 +49,9 @@ in
   };
 
   security.sudo.extraConfig = ''
-    		%nix ALL=(ALL) NOPASSWD: ${lib.getExe pkgs.nix} run nix-darwin/master\#darwin-rebuild -- switch --flake ${setup.systemFlakePath}
-    		%nix ALL=(ALL) NOPASSWD: ${lib.getExe pkgs.nix} flake update --flake ${setup.systemFlakePath}
-    	'';
+    %nix ALL=(ALL) NOPASSWD: ${lib.getExe pkgs.nix} run nix-darwin/master\#darwin-rebuild -- switch --flake ${setup.systemFlakePath}
+    %nix ALL=(ALL) NOPASSWD: ${lib.getExe pkgs.nix} flake update --flake ${setup.systemFlakePath}
+  '';
 
   # Other system settings
 

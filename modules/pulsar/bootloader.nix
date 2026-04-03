@@ -27,27 +27,27 @@
     ];
 
     script = ''
-      			#!${pkgs.bash}/bin/bash
-      			set -euo pipefail
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
 
-      			BACKUP_ESP_DEVICE="/dev/disk/by-partlabel/ESP-BACKUP"
-      			MOUNT_POINT="/mnt/esp-backup"
+      BACKUP_ESP_DEVICE="/dev/disk/by-partlabel/ESP-BACKUP"
+      MOUNT_POINT="/mnt/esp-backup"
 
-      			if [ -e "$BACKUP_ESP_DEVICE" ]; then
-      				echo "Backup ESP found. Syncing boot files..."
-      				mkdir -p "$MOUNT_POINT"
-      				
-      				# Mount, sync (mirroring deletes), and unmount the backup ESP.
-      				mount "$BACKUP_ESP_DEVICE" "$MOUNT_POINT"
-      				rsync -a --delete /boot/ "$MOUNT_POINT/"
-      				umount "$MOUNT_POINT"
-      				rmdir "$MOUNT_POINT"
-      				
-      				echo "Backup ESP sync complete."
-      			else
-      				echo "WARNING: Backup ESP partition 'ESP-BACKUP' not found. Skipping sync." >&2
-      			fi
-      		'';
+      if [ -e "$BACKUP_ESP_DEVICE" ]; then
+        echo "Backup ESP found. Syncing boot files..."
+        mkdir -p "$MOUNT_POINT"
+        
+        # Mount, sync (mirroring deletes), and unmount the backup ESP.
+        mount "$BACKUP_ESP_DEVICE" "$MOUNT_POINT"
+        rsync -a --delete /boot/ "$MOUNT_POINT/"
+        umount "$MOUNT_POINT"
+        rmdir "$MOUNT_POINT"
+        
+        echo "Backup ESP sync complete."
+      else
+        echo "WARNING: Backup ESP partition 'ESP-BACKUP' not found. Skipping sync." >&2
+      fi
+    '';
   };
 
   # --- Automated UEFI Boot Entry Creation for Backup ---
@@ -73,29 +73,29 @@
     ];
 
     script = ''
-      			#!${pkgs.bash}/bin/bash
-      			set -euo pipefail
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
 
-      			if ! efibootmgr | grep -q "NixOS (Backup)"; then
-      				BACKUP_ESP_SYMLINK="/dev/disk/by-partlabel/ESP-BACKUP"
+      if ! efibootmgr | grep -q "NixOS (Backup)"; then
+        BACKUP_ESP_SYMLINK="/dev/disk/by-partlabel/ESP-BACKUP"
 
-      				if [ -L "$BACKUP_ESP_SYMLINK" ]; then
-      					REAL_DEVICE_PATH=$(readlink -f "$BACKUP_ESP_SYMLINK")
-      					
-      					# Reliably get disk and partition number for efibootmgr
-      					DISK_DEVICE="/dev/$(lsblk -no pkname "$REAL_DEVICE_PATH")"
-      					PARTITION_NUMBER=$(lsblk -no PARTN "$REAL_DEVICE_PATH")
-      					
-      					echo "Creating UEFI boot entry for backup ESP..."
-      					
-      					efibootmgr -c -d "$DISK_DEVICE" -p "$PARTITION_NUMBER" \
-      						-L "NixOS (Backup)" -l '\EFI\systemd\systemd-bootx64.efi'
-      				else
-      					echo "WARNING: Backup ESP device not found, cannot create UEFI boot entry." >&2
-      				fi
-      			else
-      				echo "NixOS (Backup) UEFI entry already exists, skipping creation."
-      			fi
-      		'';
+        if [ -L "$BACKUP_ESP_SYMLINK" ]; then
+          REAL_DEVICE_PATH=$(readlink -f "$BACKUP_ESP_SYMLINK")
+          
+          # Reliably get disk and partition number for efibootmgr
+          DISK_DEVICE="/dev/$(lsblk -no pkname "$REAL_DEVICE_PATH")"
+          PARTITION_NUMBER=$(lsblk -no PARTN "$REAL_DEVICE_PATH")
+          
+          echo "Creating UEFI boot entry for backup ESP..."
+          
+          efibootmgr -c -d "$DISK_DEVICE" -p "$PARTITION_NUMBER" \
+            -L "NixOS (Backup)" -l '\EFI\systemd\systemd-bootx64.efi'
+        else
+          echo "WARNING: Backup ESP device not found, cannot create UEFI boot entry." >&2
+        fi
+      else
+        echo "NixOS (Backup) UEFI entry already exists, skipping creation."
+      fi
+    '';
   };
 }

@@ -11,6 +11,6 @@
       mkdir -p ${setup.systemFlakePath}
       chown -R root:nix ${setup.systemFlakePath}
       chmod -R g+rwX ${setup.systemFlakePath}
-      '';
+    '';
   };
 }

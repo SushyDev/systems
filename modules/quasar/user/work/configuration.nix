@@ -98,5 +98,5 @@
             -t "$(_glab_mr_title)" \
             -a "$GITLAB_USERNAME"
     }
-    '';
+  '';
 }
