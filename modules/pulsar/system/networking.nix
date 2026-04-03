@@ -1,4 +1,4 @@
 { ... }:
 {
-	# Networking configuration is handled in the main configuration.nix
+  # Networking configuration is handled in the main configuration.nix
 }

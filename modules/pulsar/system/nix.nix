@@ -1,6 +1,4 @@
 { ... }:
 {
-	imports = [ ../../shared/nix.nix ];
+  imports = [ ../../shared/nix.nix ];
 }
-
-

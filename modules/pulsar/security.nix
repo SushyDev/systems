@@ -1,5 +1,5 @@
 { ... }:
 {
-	# --- User
-	security.sudo.wheelNeedsPassword = false;
+  # --- User
+  security.sudo.wheelNeedsPassword = false;
 }

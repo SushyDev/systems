@@ -1,12 +1,12 @@
 { ... }:
 {
-	programs.nano.enable = false;
+  programs.nano.enable = false;
 
-	# --- Other
-	programs.fuse.userAllowOther = true;
+  # --- Other
+  programs.fuse.userAllowOther = true;
 
-	programs.direnv = {
-		enable = true;
-		nix-direnv.enable = true;
-	};
+  programs.direnv = {
+    enable = true;
+    nix-direnv.enable = true;
+  };
 }

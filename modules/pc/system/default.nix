@@ -1,20 +1,20 @@
 { setup, ... }:
 {
-	imports = [ 
-		./nix.nix
-		./networking.nix
-		./users-and-groups.nix
+  imports = [
+    ./nix.nix
+    ./networking.nix
+    ./users-and-groups.nix
 
-		./hardware-configuration.nix
-		./additional-hardware-configuration.nix
-	];
+    ./hardware-configuration.nix
+    ./additional-hardware-configuration.nix
+  ];
 
-	system.activationScripts.setupSystemFlake = {
-		text = ''
-			mkdir -p ${setup.systemFlakePath}
-			chown -R root:nix ${setup.systemFlakePath}
-			chmod -R g+rwX ${setup.systemFlakePath}
-			chmod -R o+rX ${setup.systemFlakePath}
-		'';
-	};
+  system.activationScripts.setupSystemFlake = {
+    text = ''
+      mkdir -p ${setup.systemFlakePath}
+      chown -R root:nix ${setup.systemFlakePath}
+      chmod -R g+rwX ${setup.systemFlakePath}
+      chmod -R o+rX ${setup.systemFlakePath}
+    '';
+  };
 }

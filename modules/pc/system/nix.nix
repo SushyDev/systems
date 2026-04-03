@@ -1,6 +1,6 @@
 { pkgs, ... }:
 {
-	imports = [ ../../shared/nix.nix ];
+  imports = [ ../../shared/nix.nix ];
 
-	programs.nix-ld.libraries = [ pkgs.fnm ];
+  programs.nix-ld.libraries = [ pkgs.fnm ];
 }

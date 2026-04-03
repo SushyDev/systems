@@ -1,27 +1,32 @@
-{ setup, config, lib, inputs, pkgs, ... }:
 {
-	imports = [
-		./packages.nix
-		./programs.nix
-		./security.nix
-		./services.nix
+  setup,
+  config,
+  lib,
+  inputs,
+  pkgs,
+  ...
+}:
+{
+  imports = [
+    ./packages.nix
+    ./programs.nix
+    ./security.nix
+    ./services.nix
 
-		./system/default.nix
-		../shared/oxidation.nix
-		../shared/fonts.nix
-		./desktop-manager/kde.nix
-		# ./hardening.nix
-	];
+    ./system/default.nix
+    ../shared/oxidation.nix
+    ../shared/fonts.nix
+    ./desktop-manager/kde.nix
+    # ./hardening.nix
+  ];
 
-	nix.settings.trusted-users = [ "sushy" ];
+  i18n.defaultLocale = "en_US.UTF-8";
+  console.earlySetup = true;
+  time.timeZone = "Europe/Amsterdam";
+  system.stateVersion = "25.05";
 
-	i18n.defaultLocale = "en_US.UTF-8";
-	console.earlySetup = true;
-	time.timeZone = "Europe/Amsterdam";
-	system.stateVersion = "25.05";
-
-	environment.shellAliases = {
-		pbcopy = "wl-copy";
-		pbpaste = "wl-paste";
-	};
+  environment.shellAliases = {
+    pbcopy = "wl-copy";
+    pbpaste = "wl-paste";
+  };
 }

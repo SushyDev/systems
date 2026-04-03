@@ -1,83 +1,86 @@
 { pkgs, ... }:
 {
-	boot = {
-		loader = {
-			timeout = null;
+  boot = {
+    loader = {
+      timeout = null;
 
-			systemd-boot = {
-				enable = true;
-				consoleMode = "max";
-				configurationLimit = 5;
-				windows = {
-					"tiny-11-pro" = {
-						title = "Tiny 11 Pro";
-						efiDeviceHandle = "FS0";
-					};
-				};
-			};
+      systemd-boot = {
+        enable = true;
+        consoleMode = "max";
+        configurationLimit = 5;
+        windows = {
+          "tiny-11-pro" = {
+            title = "Tiny 11 Pro";
+            efiDeviceHandle = "FS0";
+          };
+        };
+      };
 
-			efi = {
-				canTouchEfiVariables = true;
-				efiSysMountPoint = "/boot";
-			};
-		};
+      efi = {
+        canTouchEfiVariables = true;
+        efiSysMountPoint = "/boot";
+      };
+    };
 
-		tmp.cleanOnBoot = true;
+    tmp.cleanOnBoot = true;
 
-		kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
+    kernel.sysctl."net.ipv4.ip_unprivileged_port_start" = 80;
 
-		kernelParams = [
-			"pci=acpi"
-			"quiet"
-			"splash"
-			"udev.log_level=3"
-			"systemd.show_status=auto"
-			"rd.udev.log_level=3"
-			"acpi_osi=Windows"
-		];
+    kernelParams = [
+      "pci=acpi"
+      "quiet"
+      "splash"
+      "udev.log_level=3"
+      "systemd.show_status=auto"
+      "rd.udev.log_level=3"
+      "acpi_osi=Windows"
+    ];
 
-		blacklistedKernelModules = [ "nouveau" ];
+    blacklistedKernelModules = [ "nouveau" ];
 
-		kernelPackages = pkgs.linuxPackages_latest;
-		# kernelPackages = pkgs.linuxPackages_cachyos;
+    kernelPackages = pkgs.linuxPackages_latest;
+    # kernelPackages = pkgs.linuxPackages_cachyos;
 
-		kernelModules = [ "bnep" "nvidia_uvm" ];
-	};
+    kernelModules = [
+      "bnep"
+      "nvidia_uvm"
+    ];
+  };
 
-	hardware = {
-		i2c.enable = true;
+  hardware = {
+    i2c.enable = true;
 
-		bluetooth = {
-			enable = true;
-			settings = {
-				General.Experimental = true;
-			};
+    bluetooth = {
+      enable = true;
+      settings = {
+        General.Experimental = true;
+      };
 
-		};
+    };
 
-		nvidia = {
-			open = true;
-			modesetting.enable = true;
+    nvidia = {
+      open = true;
+      modesetting.enable = true;
 
-			# THIS is the specific fix for the sleep/wake issue.
-			# It enables the nvidia-suspend/resume/hibernate systemd services
-			# and sets NVreg_PreserveVideoMemoryAllocations=1 automatically.
-			powerManagement.enable = true;
+      # THIS is the specific fix for the sleep/wake issue.
+      # It enables the nvidia-suspend/resume/hibernate systemd services
+      # and sets NVreg_PreserveVideoMemoryAllocations=1 automatically.
+      powerManagement.enable = true;
 
-			# Keep this false unless you are on a laptop with a very new GPU (Turing+)
-			# and specifically want the GPU to turn off completely when not in use.
-			# For sleep stability, false is often safer.
-			powerManagement.finegrained = false;
-		};
+      # Keep this false unless you are on a laptop with a very new GPU (Turing+)
+      # and specifically want the GPU to turn off completely when not in use.
+      # For sleep stability, false is often safer.
+      powerManagement.finegrained = false;
+    };
 
-		graphics.enable = true;
-		graphics.extraPackages = [ pkgs.nvidia-vaapi-driver ];
-	};
+    graphics.enable = true;
+    graphics.extraPackages = [ pkgs.nvidia-vaapi-driver ];
+  };
 
-	environment.sessionVariables = {
-		LIBVA_DRIVER_NAME = "nvidia";
-		NVD_BACKEND = "direct";
-	};
+  environment.sessionVariables = {
+    LIBVA_DRIVER_NAME = "nvidia";
+    NVD_BACKEND = "direct";
+  };
 
-	services.xserver.videoDrivers = [ "nvidia" ];
+  services.xserver.videoDrivers = [ "nvidia" ];
 }

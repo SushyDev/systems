@@ -1,39 +1,39 @@
 {
-	base,
-	inputs,
-	pkgs, 
-	...
+  base,
+  inputs,
+  pkgs,
+  ...
 }:
 {
-	imports = [
-		./darwin.nix
-		../shared/oxidation.nix
-	];
+  imports = [
+    ./darwin.nix
+    ../shared/oxidation.nix
+  ];
 
-	nixpkgs.overlays = [ inputs.nix-darwin-apps.overlays.default ];
-	nixpkgs.config.allowUnfree = true;
+  nixpkgs.overlays = [ inputs.nix-darwin-apps.overlays.default ];
+  nixpkgs.config.allowUnfree = true;
 
-	# List packages installed in system profile. To search by name, run:
-	# $ nix-env -qaP | grep wget
-	environment.systemPackages = [
-		pkgs.opencode
-		pkgs.openssh
-		pkgs._1password-gui
-		pkgs._1password-cli
-		pkgs.raycast
-		pkgs.obsidian
-		pkgs.ddev
-		pkgs.opencode
-		pkgs.aerospace
+  # List packages installed in system profile. To search by name, run:
+  # $ nix-env -qaP | grep wget
+  environment.systemPackages = [
+    pkgs.opencode
+    pkgs.openssh
+    pkgs._1password-gui
+    pkgs._1password-cli
+    pkgs.raycast
+    pkgs.obsidian
+    pkgs.ddev
+    pkgs.opencode
+    pkgs.aerospace
 
-		# My own overlay
-		# # pkgs.cloudflare-warp-gui
-		# # pkgs.google-chrome-canary
-		pkgs.dbeaver
-		pkgs.ghostty
-		pkgs.orbstack
-		pkgs.setapp
-		pkgs.spotify
-		pkgs.vivaldi
-	];
+    # My own overlay
+    # # pkgs.cloudflare-warp-gui
+    # # pkgs.google-chrome-canary
+    pkgs.dbeaver
+    pkgs.ghostty
+    pkgs.orbstack
+    pkgs.setapp
+    pkgs.spotify
+    pkgs.vivaldi
+  ];
 }
