@@ -10,7 +10,7 @@
     enable = true;
     enableOnBoot = true;
     rootless = {
-      enable = true;
+      enable = false;
       setSocketVariable = true;
     };
   };
