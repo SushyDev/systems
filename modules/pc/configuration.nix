@@ -49,10 +49,6 @@
         password = "magento";
         rootPassword = "magento";
       };
-
-      # Resource limits
-      memoryLimit = "8G";
-      cpuQuota = "400%";
     };
   };
 }
