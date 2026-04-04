@@ -6,6 +6,9 @@
     extraConfig = "UsePrivilegeSeparation sandbox";
   };
 
+  # Enable NixOS containers
+  virtualisation.containers.enable = true;
+
   virtualisation.docker = {
     enable = true;
     enableOnBoot = true;
