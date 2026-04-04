@@ -54,6 +54,16 @@
       url = "github:sushydev/nix-lib";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    m2-nix-container = {
+      url = "path:/home/sushy/Documents/Projects/m2-nix-container";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    appie-goossens-m2 = {
+      url = "path:/home/sushy/Documents/Projects/appie-goossens-m2";
+      flake = false;
+    };
   };
 
   outputs =
@@ -66,6 +76,8 @@
       plasma-manager,
       nix-darwin,
       nix-plist-manager,
+      m2-nix-container,
+      appie-goossens-m2,
       ...
     }@inputs:
     let
