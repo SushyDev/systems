@@ -49,6 +49,46 @@
         password = "magento";
         rootPassword = "magento";
       };
+
+      # Cache
+      cache = {
+        host = "192.168.102.2";
+        port = 6379;
+        db = 0;
+      };
+
+      # Session
+      session = {
+        host = "192.168.103.2";
+        port = 6379;
+        db = 1;
+      };
+
+      # OpenSearch
+      opensearch = {
+        host = "192.168.104.2";
+        port = 9200;
+      };
+
+      # RabbitMQ
+      rabbitmq = {
+        host = "192.168.105.2";
+        port = 5672;
+        user = "guest";
+        password = "guest";
+      };
+
+      # Nginx
+      nginx = {
+        host = "192.168.106.2";
+        port = 8080;
+      };
+
+      # Varnish
+      varnish = {
+        host = "192.168.107.2";
+        port = 6081;
+      };
     };
   };
 }
