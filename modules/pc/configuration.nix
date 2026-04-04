@@ -38,7 +38,23 @@
     instances.appie-goossens = {
       magentoSrcInput = "appie-goossens-m2";
       dataPath = "/var/lib/containers/magento-appie";
+      networkPrefix = "192.168.100";
       
+      # PHP-FPM configuration
+      php = {
+        memoryLimit = "2G";
+        maxExecutionTime = 1800;
+        maxChildren = 64;
+        startServers = 8;
+        minSpareServers = 4;
+        maxSpareServers = 16;
+      };
+      
+      stateVersion = "24.05";
+      autoStart = false;
+      hostAddress = "192.168.100.1";
+      localAddress = "192.168.100.2";
+
       # Override default database name
       mariadb.database = "magento_appie";
     };
