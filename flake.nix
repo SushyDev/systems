@@ -61,7 +61,8 @@
     };
 
     appie-goossens-m2 = {
-      url = "path:/home/sushy/Documents/Projects/appie-goossens-m2";
+      type = "git";
+      url = "git@github.com:SushyDev/appie-goossens-m2.git";
       flake = false;
     };
   };
