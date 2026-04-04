@@ -63,6 +63,16 @@
         password = "magento";
         rootPassword = "magento";
       };
+
+      magento = {
+        baseUrl = "http://localhost/";
+        adminFirstname = "Admin";
+        adminLastname = "User";
+        adminEmail = "admin@example.com";
+        adminUser = "admin";
+        adminPassword = "Admin@123456";
+        adminUri = "admin";
+      };
     };
   };
 }
