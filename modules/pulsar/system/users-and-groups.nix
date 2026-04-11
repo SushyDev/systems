@@ -15,6 +15,7 @@
       "docker"
       "media"
       "nix"
+      "kubernetes"
     ];
   };
 
@@ -23,4 +24,7 @@
   users.users.sushy.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDK2znreT4nuwGavrkejyLgVUvVeSgL/9T/+wXOZdhOr"
   ];
+
+  # Pre-set the KUBECONFIG environment variable for your shell
+  environment.variables.KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
 }
