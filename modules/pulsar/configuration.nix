@@ -13,6 +13,7 @@
     ./programs.nix
     ./security.nix
     ./services.nix
+    ./kubernetes.nix
 
     ./system/default.nix
     ../shared/oxidation.nix
