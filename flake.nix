@@ -43,27 +43,16 @@
     };
 
     dotfiles = {
-      # url = "path:/Users/sushy/Documents/Projects/dotfiles";
-      type = "git";
-      url = "https://github.com/sushydev/dotfiles";
-      ref = "main";
-      submodules = true;
+      url = "path:/home/sushy/Documents/Projects/dotfiles";
+      # type = "git";
+      # url = "https://github.com/sushydev/dotfiles";
+      # ref = "main";
+      # submodules = true;
     };
 
     sushy-lib = {
       url = "github:sushydev/nix-lib";
       inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    m2-nix-container = {
-      url = "path:/home/sushy/Documents/Projects/m2-nix-container";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    appie-goossens-m2 = {
-      type = "git";
-      url = "git@github.com:SushyDev/appie-goossens-m2.git";
-      flake = false;
     };
   };
 
@@ -77,8 +66,6 @@
       plasma-manager,
       nix-darwin,
       nix-plist-manager,
-      m2-nix-container,
-      appie-goossens-m2,
       ...
     }@inputs:
     let

@@ -1,0 +1,28 @@
+{ config, pkgs, lib, ... }:
+
+{
+  # OpenSearch requires vm.max_map_count >= 262144
+  boot.kernel.sysctl."vm.max_map_count" = 262144;
+
+  services.kubernetes = {
+    roles = [ "master" "node" ];
+    masterAddress = "localhost";
+    easyCerts = true;
+    addons.dns.enable = true;
+    kubelet.extraOpts = "--fail-swap-on=false";
+  };
+
+  # Create hostPath directories that pods mount for persistent storage
+  system.activationScripts.k8s-data-dirs = lib.stringAfter [ "var" ] ''
+    mkdir -p /data/mariadb /data/opensearch /data/keydb-cache /data/keydb-session /data/magento-webroot
+    chmod 0777 /data/mariadb /data/opensearch /data/keydb-cache /data/keydb-session /data/magento-webroot
+  '';
+
+  environment.variables.KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
+
+  environment.systemPackages = with pkgs; [
+    kubectl
+    kubernetes-helm
+    k9s
+  ];
+}

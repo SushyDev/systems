@@ -65,6 +65,10 @@ in
   networking.computerName = "quasar";
   networking.hostName = "quasar";
   networking.localHostName = "quasar";
+  networking.nameservers = [
+    "1.1.1.1"
+    "8.8.8.8"
+  ];
 
   security.pam.services.sudo_local.touchIdAuth = true;
 }

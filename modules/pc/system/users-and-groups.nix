@@ -13,6 +13,8 @@
       "wheel"
       "docker"
       "i2c"
+      "onepassword"
+      "kubernetes"
     ];
     uid = 1000;
     openssh.authorizedKeys.keys = [
