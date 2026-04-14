@@ -4,6 +4,7 @@
   lib,
   pkgs,
   setup,
+  systemConfig,
   ...
 }:
 {
@@ -13,8 +14,8 @@
     ../shared/configuration.nix
     ../shared/nix-plist-manager.nix
     ../shared/1password.nix
-    ../shared/ddev.nix
-    ../shared/direnv.nix
+    ../../../shared/user/ddev.nix
+    ../../../shared/user/direnv.nix
   ];
 
   dotfiles = {
@@ -53,6 +54,15 @@
     pkgs.age
     pkgs.yq
   ];
+
+  # programs.git = {
+  #   includes = [
+  #     {
+  #       condition = "gitdir:/Users/work/Documents/Projects/dotfiles/";
+  #       path = "~/.config/git/sushy";
+  #     }
+  #   ];
+  # };
 
   programs.zsh.initContent = ''
     EDITOR=nvim

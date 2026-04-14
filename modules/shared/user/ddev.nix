@@ -2,7 +2,7 @@
   lib,
   pkgs,
   config,
-  systemConfig ? null,
+  systemConfig,
   ...
 }:
 let

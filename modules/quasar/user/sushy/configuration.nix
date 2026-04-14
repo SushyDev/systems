@@ -13,7 +13,7 @@
     ../shared/configuration.nix
     ../shared/nix-plist-manager.nix
     ../shared/1password.nix
-    ../shared/direnv.nix
+    ../../../shared/user/direnv.nix
   ];
 
   dotfiles = {

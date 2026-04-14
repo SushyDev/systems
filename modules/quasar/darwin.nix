@@ -11,6 +11,9 @@ let
     isHidden = false;
     shell = pkgs.zsh;
   };
+
+  darwinSwitch = "${lib.getExe pkgs.nix} run nix-darwin/master#darwin-rebuild -- switch --show-trace --flake ${setup.systemFlakePath}";
+  darwinUpdate = "${lib.getExe pkgs.nix} flake update --flake ${setup.systemFlakePath}";
 in
 {
   # Setup groups
@@ -44,13 +47,13 @@ in
   '';
 
   environment.shellAliases = {
-    darwin-switch = "/usr/bin/sudo ${lib.getExe pkgs.nix} run nix-darwin/master#darwin-rebuild -- switch --flake ${setup.systemFlakePath}";
-    darwin-update = "/usr/bin/sudo ${lib.getExe pkgs.nix} flake update --flake ${setup.systemFlakePath}";
+    darwin-switch = "${darwinSwitch}";
+    darwin-update = "${darwinUpdate}";
   };
 
   security.sudo.extraConfig = ''
-    %nix ALL=(ALL) NOPASSWD: ${lib.getExe pkgs.nix} run nix-darwin/master\#darwin-rebuild -- switch --flake ${setup.systemFlakePath}
-    %nix ALL=(ALL) NOPASSWD: ${lib.getExe pkgs.nix} flake update --flake ${setup.systemFlakePath}
+    %nix ALL=(ALL) NOPASSWD: ${darwinSwitch}
+    %nix ALL=(ALL) NOPASSWD: ${darwinUpdate}
   '';
 
   # Other system settings
