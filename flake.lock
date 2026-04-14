@@ -83,13 +83,20 @@
     },
     "dotfiles": {
       "locked": {
-        "narHash": "sha256-8WSQ8E1CgOLyA942DP7eQlWu09twKqJK41tQfI11ZTA=",
-        "path": "/home/sushy/Documents/Projects/dotfiles",
-        "type": "path"
+        "lastModified": 1772629015,
+        "narHash": "sha256-LkMt/NT+27VOkQZwUvvUWU5VgSDj8y0Uq5M4DGmMPq8=",
+        "ref": "main",
+        "rev": "a8aebf8c5756d3420b11a9f25a3a29b22e26d895",
+        "revCount": 127,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/sushydev/dotfiles"
       },
       "original": {
-        "path": "/home/sushy/Documents/Projects/dotfiles",
-        "type": "path"
+        "ref": "main",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/sushydev/dotfiles"
       }
     },
     "flake-compat": {
@@ -162,11 +169,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1775781825,
-        "narHash": "sha256-L5yKTpR+alrZU2XYYvIxCeCP4LBHU5jhwSj7H1VAavg=",
+        "lastModified": 1776136611,
+        "narHash": "sha256-b2pu3Pb28W0bJzQVP3OJHZC5+dgOOeqjlli2WVakKEU=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "e35c39fca04fee829cecdf839a50eb9b54d8a701",
+        "rev": "8a423e444b17dde406097328604a64fc7429e34e",
         "type": "github"
       },
       "original": {
@@ -241,11 +248,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1775633809,
-        "narHash": "sha256-jVTbEAxsu3S0M6FiDnS8Au25I3Hs+cplERu8Pulxheg=",
+        "lastModified": 1776166436,
+        "narHash": "sha256-T871ad0f8Fa+bXOiVBST7sVVwkocjotpbjgl/1VT9Fs=",
         "owner": "sushydev",
         "repo": "nix-darwin-apps",
-        "rev": "dbefaf6cdd07b2fec726e0969b52a4a968b0d989",
+        "rev": "4c17ec288406f0078344e094517a243ab49864e5",
         "type": "github"
       },
       "original": {
@@ -365,11 +372,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774915545,
-        "narHash": "sha256-COT4l/+ZddGBvrDVfPf7MEOJxV8EDKame6/aRnNIKcY=",
+        "lastModified": 1775856943,
+        "narHash": "sha256-b7Mp7P+q2Md5AGt4rjHfMcBykzMumFTen10ST++AuTU=",
         "owner": "nix-community",
         "repo": "plasma-manager",
-        "rev": "f3177b3c69fb3f03201098d7fe8ab6422cce7fc1",
+        "rev": "a524a6160e6df89f7673ba293cf7d78b559eb1a5",
         "type": "github"
       },
       "original": {

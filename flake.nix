@@ -43,11 +43,11 @@
     };
 
     dotfiles = {
-      url = "path:/home/sushy/Documents/Projects/dotfiles";
-      # type = "git";
-      # url = "https://github.com/sushydev/dotfiles";
-      # ref = "main";
-      # submodules = true;
+      # url = "path:/home/sushy/Documents/Projects/dotfiles";
+      type = "git";
+      url = "https://github.com/sushydev/dotfiles";
+      ref = "main";
+      submodules = true;
     };
 
     sushy-lib = {
