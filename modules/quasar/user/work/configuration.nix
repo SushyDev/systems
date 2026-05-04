@@ -14,7 +14,7 @@
     ../shared/configuration.nix
     ../shared/nix-plist-manager.nix
     ../shared/1password.nix
-    ../../../shared/user/ddev.nix
+    # ../../../shared/user/ddev.nix
     ../../../shared/user/direnv.nix
   ];
 
@@ -43,16 +43,16 @@
     pkgs.postman
 
     # K8S
-    pkgs.terraform
-    pkgs.packer
-    pkgs.hcloud
-    pkgs.talosctl
-    # pkgs.helm
-    pkgs.fluxcd
-    # pkgs.kubectl
-    pkgs.sops
-    pkgs.age
-    pkgs.yq
+    # pkgs.terraform
+    # pkgs.packer
+    # pkgs.hcloud
+    # pkgs.talosctl
+    # # pkgs.helm
+    # pkgs.fluxcd
+    # # pkgs.kubectl
+    # pkgs.sops
+    # pkgs.age
+    # pkgs.yq
   ];
 
   # programs.git = {
@@ -74,7 +74,8 @@
     PATH=$PATH:$HOME/Documents/nix/opdb/result/bin
 
     eval "$(fnm env --use-on-cd)"
-    eval "$(/opt/homebrew/bin/brew shellenv)"
+    # TODO Only if directory exists
+    # eval "$(/opt/homebrew/bin/brew shellenv)"
 
     # 1Password plugin needs the completealiases to keep autocomplete working for the aliases it createas for each command
     source $HOME/.config/op/plugins.sh

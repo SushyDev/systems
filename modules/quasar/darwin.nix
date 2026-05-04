@@ -22,7 +22,7 @@ in
 
   users.groups."${setup.nixGroupName}" = {
     name = setup.nixGroupName;
-    gid = setup.nixGroupId;
+    gid = 502;
     members = setup.managedUsers;
   };
 
@@ -31,11 +31,11 @@ in
   users.knownUsers = setup.managedUsers;
 
   users.users.sushy = mkStandardUser "sushy" // {
-    uid = 502;
+    uid = 501;
   };
 
   users.users.work = mkStandardUser "work" // {
-    uid = 501;
+    uid = 503;
   };
 
   # Setup basic nix conveniences

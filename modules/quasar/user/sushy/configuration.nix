@@ -29,7 +29,7 @@
 
   home.packages = [
     # pkgs.go
-    pkgs.utm
+    # pkgs.utm
     pkgs.discord
     pkgs.blender
     # pkgs.ollama

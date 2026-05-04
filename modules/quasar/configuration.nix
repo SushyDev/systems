@@ -22,7 +22,6 @@
     pkgs._1password-cli
     pkgs.raycast
     pkgs.obsidian
-    pkgs.ddev
     pkgs.opencode
     pkgs.aerospace
 

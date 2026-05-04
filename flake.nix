@@ -132,7 +132,7 @@
             managedUsersAndRoot = [ "root" ] ++ systemPulsar.specialArgs.setup.managedUsers;
             nixGroupMembers = [ systemPulsar.specialArgs.setup.primaryUser ];
             nixGroupName = "nix";
-            nixGroupId = 101;
+            nixGroupId = 502;
             systemFlakePath = "/etc/nixos";
           };
         };
