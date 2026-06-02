@@ -37,10 +37,10 @@
       pkgs.mkcert
       pkgs.xdg-utils
       pkgs.dbeaver-bin
-      pkgs.php83
-      pkgs.gcc
-      pkgs.i2c-tools
-      pkgs.rustup
+      # pkgs.php83
+      #pkgs.gcc
+      #pkgs.i2c-tools
+      #pkgs.rustup
     ];
 
   fonts.packages = [

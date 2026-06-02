@@ -56,15 +56,20 @@
             showScrollBars = "Automatically based on mouse or trackpad";
             clickInTheScrollBarTo = "Jump to the next page";
           };
+
+          appleIntelligenceAndSiri = {
+            appleIntelligence = true;
+          };
+
           desktopAndDock = {
             dock = {
               size = 48;
               magnification = {
                 enabled = false;
               };
-              positionOnScreen = "Bottom";
-              minimizeWindowsUsing = "Genie Effect";
-              doubleClickAWindowsTitleBarTo = "Fill";
+              dockPositionOnScreen = "Bottom";
+              minimizedWindowAnimation = "Genie Effect";
+              windowTitleBarDoubleClickAction = "Fill";
               minimizeWindowsIntoApplicationIcon = true;
               automaticallyHideAndShowTheDock = {
                 enabled = true;
@@ -90,7 +95,7 @@
                 onDesktop = false;
                 inStageManager = false;
               };
-              widgetStyle = "Automatic";
+              dimWidgetsOnDesktop = "Automatically";
               useIphoneWidgets = false;
             };
             windows = {
@@ -118,6 +123,8 @@
           };
           spotlight = {
             helpAppleImproveSearch = false;
+            resultsFromClipboard = true;
+            clipboardHistoryIsAvailableInSpotlight = "7 days";
           };
           notifications = {
             notificationCenter = {

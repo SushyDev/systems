@@ -2,6 +2,7 @@
 {
   fonts = {
     packages = [
+      pkgs.fira-code
       pkgs.noto-fonts
       pkgs.noto-fonts-cjk-serif
       pkgs.noto-fonts-cjk-sans

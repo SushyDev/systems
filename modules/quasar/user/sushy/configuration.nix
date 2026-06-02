@@ -11,33 +11,37 @@
     inputs.nix-plist-manager.homeManagerModules.default
     inputs.dotfiles.homeManagerModules.default
     ../shared/configuration.nix
+    ../shared/dotfiles.nix
     ../shared/nix-plist-manager.nix
     ../shared/1password.nix
     ../../../shared/user/direnv.nix
+    ../../../shared/user/npm.nix
+    ../../../shared/user/git.nix
   ];
-
-  dotfiles = {
-    enable = true;
-    systemFlakePath = setup.systemFlakePath;
-    git = {
-      sshSignPackage = "${lib.getBin pkgs._1password-gui}/Applications/1Password.app/Contents/MacOS/op-ssh-sign";
-    };
-    ssh = {
-      identityAgentPath = "\"~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock\"";
-    };
-  };
 
   home.packages = [
-    # pkgs.go
-    # pkgs.utm
     pkgs.discord
     pkgs.blender
-    # pkgs.ollama
   ];
 
-  programs.git = {
-    settings.user.name = "SushyDev";
-    settings.user.email = "mail@sushy.dev";
-    signing.key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIImyhNk+raDf5TXHFWOyWIKw8IQapkhwJ5e+iLQydSFR";
+  programs.zsh = {
+    initContent = ''
+      # TODO Only if directory exists
+      eval "$(fnm env --use-on-cd)"
+      # eval "$(/opt/homebrew/bin/brew shellenv)"
+
+      # 1Password plugin needs the completealiases to keep autocomplete working for the aliases it createas for each command
+      source $HOME/.config/op/plugins.sh
+      setopt completealiases
+    '';
+
+    sessionVariables =
+      let
+        bashList = list: "(${builtins.concatStringsSep " " list})";
+      in
+      {
+        EDITOR = "nvim";
+        PROJECTS = bashList [ "$HOME/Documents/Projects" ];
+      };
   };
 }

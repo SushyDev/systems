@@ -47,12 +47,12 @@ in
   '';
 
   environment.shellAliases = {
-    darwin-switch = "${darwinSwitch}";
+    darwin-switch = "sudo ${darwinSwitch}";
     darwin-update = "${darwinUpdate}";
   };
 
   security.sudo.extraConfig = ''
-    %nix ALL=(ALL) NOPASSWD: ${darwinSwitch}
+    %nix ALL=(ALL) NOPASSWD: ${lib.strings.replaceString "#" "\\#" darwinSwitch}
     %nix ALL=(ALL) NOPASSWD: ${darwinUpdate}
   '';
 
@@ -74,4 +74,5 @@ in
   # ];
 
   security.pam.services.sudo_local.touchIdAuth = true;
+  security.pam.services.sudo_local.reattach = true;
 }

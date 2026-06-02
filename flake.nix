@@ -37,17 +37,17 @@
     };
 
     nix-plist-manager = {
-      # url = "path:/Users/sushy/Documents/Projects/nix-plist-manager-v2";
-      url = "github:sushydev/nix-plist-manager?ref=main";
+      url = "path:/Users/sushy/Documents/Projects/nix-plist-manager";
+      #url = "github:sushydev/nix-plist-manager?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     dotfiles = {
-      # url = "path:/home/sushy/Documents/Projects/dotfiles";
-      type = "git";
-      url = "https://github.com/sushydev/dotfiles";
-      ref = "main";
-      submodules = true;
+      url = "path:/Users/work/Documents/Projects/dotfiles";
+#type = "git";
+# url = "https://github.com/sushydev/dotfiles";
+#ref = "main";
+#submodules = true;
     };
 
     sushy-lib = {

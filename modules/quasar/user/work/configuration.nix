@@ -12,102 +12,55 @@
     inputs.nix-plist-manager.homeManagerModules.default
     inputs.dotfiles.homeManagerModules.default
     ../shared/configuration.nix
+    ../shared/dotfiles.nix
     ../shared/nix-plist-manager.nix
     ../shared/1password.nix
-    # ../../../shared/user/ddev.nix
+    ../../../shared/user/git.nix
+    ../../../shared/user/npm.nix
     ../../../shared/user/direnv.nix
+    # ../../../shared/user/ddev.nix
   ];
 
-  dotfiles = {
-    enable = true;
-    systemFlakePath = setup.systemFlakePath;
-    git = {
-      sshSignPackage = "${lib.getBin pkgs._1password-gui}/Applications/1Password.app/Contents/MacOS/op-ssh-sign";
-    };
-    ssh = {
-      identityAgentPath = "\"~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock\"";
-    };
-  };
-
-  programs.ssh = {
-    includes = [
-      "${config.xdg.configHome}/ssh/1password_servers_config"
-    ];
-  };
-
-  home.packages = [
-    pkgs.slack
-    pkgs.phpstorm
-    pkgs.glab
-    pkgs.mongodb-compass
-    pkgs.postman
-
-    # K8S
-    # pkgs.terraform
-    # pkgs.packer
-    # pkgs.hcloud
-    # pkgs.talosctl
-    # # pkgs.helm
-    # pkgs.fluxcd
-    # # pkgs.kubectl
-    # pkgs.sops
-    # pkgs.age
-    # pkgs.yq
-  ];
-
-  # programs.git = {
+  # programs.ssh = {
   #   includes = [
-  #     {
-  #       condition = "gitdir:/Users/work/Documents/Projects/dotfiles/";
-  #       path = "~/.config/git/sushy";
-  #     }
+  #     "${config.xdg.configHome}/ssh/1password_servers_config"
   #   ];
   # };
 
-  programs.zsh.initContent = ''
-    EDITOR=nvim
-    PROJECTS=(
-        $HOME/Documents/projects
-        $HOME/Documents/projects/connectors
-    )
+  home.packages = [
+    pkgs.slack
+    pkgs.gh
+    pkgs.postman
+    pkgs.notion-app
+  ];
 
-    PATH=$PATH:$HOME/Documents/nix/opdb/result/bin
+  programs.git = {
+    includes = [
+      {
+        condition = "gitdir:/Users/work/Documents/Projects/dotfiles/";
+        path = "~/.config/git/sushy";
+      }
+    ];
+  };
 
-    eval "$(fnm env --use-on-cd)"
-    # TODO Only if directory exists
-    # eval "$(/opt/homebrew/bin/brew shellenv)"
+  programs.zsh = {
+    initContent = ''
+      # TODO Only if directory exists
+      eval "$(fnm env --use-on-cd)"
+      # eval "$(/opt/homebrew/bin/brew shellenv)"
 
-    # 1Password plugin needs the completealiases to keep autocomplete working for the aliases it createas for each command
-    source $HOME/.config/op/plugins.sh
-    setopt completealiases
+      # 1Password plugin needs the completealiases to keep autocomplete working for the aliases it createas for each command
+      source $HOME/.config/op/plugins.sh
+      setopt completealiases
+    '';
 
-    _glab_mr_title() {
-        local -r branch_name=$(git symbolic-ref --short HEAD)
-        local -r jira_ticket=$(echo $branch_name | grep -oE '[A-Z]+-[0-9]+')
-        local -r feature_name=$(echo $branch_name | sed -E "s/(.*)$jira_ticket-//")
-
-        if [ "$jira_ticket" ]; then
-            echo "$jira_ticket :: $feature_name"
-        else
-            echo "$branch_name"
-        fi
-    }
-
-    mkmr() {
-        local -r branch_name="$1"
-
-        if [ -z "$branch_name" ]; then
-            echo "Usage: mkmr <base-branch>"
-            return
-        fi
-
-        glab mr create \
-            -y \
-            --fill \
-            --squash-before-merge \
-            -b "$branch_name" \
-            -t "$(_glab_mr_title)" \
-            -a "$GITLAB_USERNAME"
-    }
-  '';
+    sessionVariables =
+      let
+        bashList = list: "(${builtins.concatStringsSep " " list})";
+      in
+      {
+        EDITOR = "nvim";
+        PROJECTS = bashList [ "$HOME/Documents/Projects" ];
+      };
+  };
 }

@@ -24,15 +24,38 @@
     pkgs.obsidian
     pkgs.opencode
     pkgs.aerospace
+    pkgs.spotify
+    pkgs.devenv
 
     # My own overlay
-    # # pkgs.cloudflare-warp-gui
-    # # pkgs.google-chrome-canary
     pkgs.dbeaver
     pkgs.ghostty
     pkgs.orbstack
-    pkgs.setapp
-    pkgs.spotify
     pkgs.vivaldi
+
+    # # pkgs.cloudflare-warp-gui
+    # # pkgs.google-chrome-canary
+    # pkgs.setapp
   ];
+
+  fonts.packages = [
+    pkgs.fira-code
+  ];
+
+  # 1. Enable and configure dnsmasq
+  services.dnsmasq = {
+    enable = true;
+
+    # Route all *.test requests directly to localhost
+    addresses = {
+      test = "127.0.0.1";
+    };
+  };
+
+  # 2. Create the macOS resolver file declaratively
+  environment.etc."resolver/localhost".text = ''
+    nameserver 127.0.0.1
+    port 53
+  '';
+
 }
