@@ -6,7 +6,7 @@
     options = {
       applications = {
         systemSettings = {
-          controlCenter = {
+          menuBar = {
             wifi = false;
             bluetooth = false;
             airdrop = false;
@@ -102,8 +102,8 @@
               preferTabsWhenOpeningDocuments = "Never";
               askToKeepChangesWhenClosingDocuments = false;
               closeWindowsWhenQuittingAnApplication = false;
-              dragWindowsToScreenEdgesToTile = false;
-              dragWindowsToMenuBarToFillScreen = false;
+              dragWindowsToScreenEdgesToTile = true;
+              dragWindowsToMenuBarToFillScreen = true;
               holdOptionKeyWhileDraggingWindowsToTile = false;
               tiledWindowsHaveMargin = false;
             };

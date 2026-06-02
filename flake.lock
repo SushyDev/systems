@@ -83,13 +83,20 @@
     },
     "dotfiles": {
       "locked": {
-        "narHash": "sha256-qPi53xuiKlzyy0GsyWOwhaeS8xEsSKXvJmT8KM5nxpE=",
-        "path": "/Users/work/Documents/Projects/dotfiles",
-        "type": "path"
+        "lastModified": 1780423156,
+        "narHash": "sha256-1jMrsw4pH1kUvhqsxBR3UcvVpuclK7pNN+4wdNndbUI=",
+        "ref": "main",
+        "rev": "55daac57c7cc90a6406eb0e6208c3fd83902f91f",
+        "revCount": 129,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/sushydev/dotfiles"
       },
       "original": {
-        "path": "/Users/work/Documents/Projects/dotfiles",
-        "type": "path"
+        "ref": "main",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/sushydev/dotfiles"
       }
     },
     "flake-compat": {
@@ -263,13 +270,18 @@
         ]
       },
       "locked": {
-        "narHash": "sha256-TkNQdTHnIImXNWwu4YAbJw4PEtawLo0rD3GsJSIjTSE=",
-        "path": "/Users/sushy/Documents/Projects/nix-plist-manager",
-        "type": "path"
+        "lastModified": 1780429022,
+        "narHash": "sha256-PjyVi3OzypfHfLzNxCUJfiWy93FwpUqze02m6sVAbvQ=",
+        "owner": "sushydev",
+        "repo": "nix-plist-manager",
+        "rev": "c7b708ed45f0d25c474e286320a8c9831c7c9a3b",
+        "type": "github"
       },
       "original": {
-        "path": "/Users/sushy/Documents/Projects/nix-plist-manager",
-        "type": "path"
+        "owner": "sushydev",
+        "ref": "main",
+        "repo": "nix-plist-manager",
+        "type": "github"
       }
     },
     "nixpkgs": {

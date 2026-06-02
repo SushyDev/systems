@@ -19,6 +19,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    sushy-lib = {
+      url = "github:sushydev/nix-lib";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     plasma-manager = {
       url = "github:nix-community/plasma-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -31,28 +36,23 @@
     };
 
     nix-darwin-apps = {
-      # url = "path:/Users/sushy/Documents/Projects/nix-darwin-apps";
+      #url = "path:/Users/sushy/Documents/Projects/nix-darwin-apps";
       url = "github:sushydev/nix-darwin-apps?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     nix-plist-manager = {
-      url = "path:/Users/sushy/Documents/Projects/nix-plist-manager";
-      #url = "github:sushydev/nix-plist-manager?ref=main";
+      #url = "path:/Users/sushy/Documents/Projects/nix-plist-manager";
+      url = "github:sushydev/nix-plist-manager?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     dotfiles = {
-      url = "path:/Users/work/Documents/Projects/dotfiles";
-#type = "git";
-# url = "https://github.com/sushydev/dotfiles";
-#ref = "main";
-#submodules = true;
-    };
-
-    sushy-lib = {
-      url = "github:sushydev/nix-lib";
-      inputs.nixpkgs.follows = "nixpkgs";
+      #url = "path:/Users/work/Documents/Projects/dotfiles";
+      url = "https://github.com/sushydev/dotfiles";
+      type = "git";
+      ref = "main";
+      submodules = true;
     };
   };
 
