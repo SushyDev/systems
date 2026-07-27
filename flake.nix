@@ -48,11 +48,11 @@
     };
 
     dotfiles = {
-      #url = "path:/Users/work/Documents/Projects/dotfiles";
-      url = "https://github.com/sushydev/dotfiles";
-      type = "git";
-      ref = "main";
-      submodules = true;
+      url = "path:/Users/work/Documents/Projects/dotfiles";
+      #url = "https://github.com/sushydev/dotfiles";
+      #type = "git";
+      #ref = "main";
+      #submodules = true;
     };
   };
 

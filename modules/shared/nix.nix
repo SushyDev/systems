@@ -18,6 +18,8 @@
         "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
       ];
       download-buffer-size = 2147483648;
+      keep-outputs = true;
+      keep-derivations = true;
     };
     gc = {
       automatic = true;

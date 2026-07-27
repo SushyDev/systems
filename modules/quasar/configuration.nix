@@ -26,6 +26,7 @@
     pkgs.aerospace
     pkgs.spotify
     pkgs.devenv
+    pkgs.git-lfs
 
     # My own overlay
     pkgs.dbeaver
