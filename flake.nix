@@ -54,6 +54,10 @@
       #ref = "main";
       #submodules = true;
     };
+
+    claude-lite = {
+      url = "path:/Users/work/Documents/Projects/claude-lite";
+    };
   };
 
   outputs =

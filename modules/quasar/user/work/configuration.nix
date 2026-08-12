@@ -18,6 +18,7 @@
     ../../../shared/user/git.nix
     ../../../shared/user/npm.nix
     ../../../shared/user/direnv.nix
+    ../../../shared/user/ssh.nix
     # ../../../shared/user/ddev.nix
   ];
 
@@ -35,7 +36,7 @@
     pkgs.google-chrome
     pkgs.librewolf
     pkgs.acli
-    pkgs.claude-code
+    pkgs.antigravity-cli
     pkgs.fnm
   ];
 

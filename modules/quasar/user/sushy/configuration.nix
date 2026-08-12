@@ -17,6 +17,7 @@
     ../../../shared/user/direnv.nix
     ../../../shared/user/npm.nix
     ../../../shared/user/git.nix
+    ../../../shared/user/ssh.nix
   ];
 
   home.packages = [
