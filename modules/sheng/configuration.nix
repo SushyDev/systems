@@ -16,7 +16,7 @@
     ./system/default.nix
     ../shared/oxidation.nix
     ../shared/fonts.nix
-    ./desktop-manager/kde.nix
+    ./desktop-manager
   ];
 
   networking.hostName = "sheng";
@@ -25,12 +25,12 @@
   console.earlySetup = true;
   time.timeZone = "Europe/Amsterdam";
 
-  # Mutable copy of this flake at /etc/nixos in the image, so the tablet
-  # rebuilds from the config it was flashed with.
-  sheng.rootfs.etcNixosSource = inputs.self;
-
-  # Qt Multimedia via GStreamer; without it Qt apps report "no camera detected".
-  sheng.camera.qtGstreamerBackend = true;
+  # The touch shell, offered beside the desktop one in the U-Boot menu.
+  # inheritParentConfig defaults to true, so everything else -- firmware,
+  # users, home-manager, the package set -- comes through unchanged.
+  specialisation.plasma-mobile.configuration = {
+    sheng.desktop.shell = "plasma-mobile";
+  };
 
   # No sheng.rootfs.imageSize: a fixed size corrupts the block groups resize2fs
   # adds, which then blocks growfs too.
