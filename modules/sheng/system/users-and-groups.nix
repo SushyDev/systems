@@ -14,20 +14,14 @@
       "networkmanager"
       "video"
       "input"
-      # programs._1password-gui creates this; the browser/CLI integration
-      # and the SSH agent socket are unreachable without it.
+      # programs._1password-gui creates this; the CLI integration and agent
+      # socket need it.
       "onepassword"
     ];
     uid = 1000;
 
-    # Without this the account has NO password, which locks it out of SDDM
-    # entirely -- the greeter has nothing to accept. initialHashedPassword
-    # rather than hashedPassword so `passwd` on the device sticks instead
-    # of being reverted by the next rebuild.
-    #
-    # This is the same "password" hash nixos-sheng bakes for root. Change
-    # it: the hash is in a world-readable store path and is published in
-    # that project's README.
+    # No password locks the account out of SDDM entirely. initialHashedPassword,
+    # so passwd on the device sticks. The hash is "password" -- change it.
     initialHashedPassword = "$6$e/k7.7lhroPMA6hy$ysO.xH9hAm5y0NCdKQs4AAT0MQFy0kP7F6XpVIryRAN1wNHReXXHx21zdonHiXwKuynriN9UA.OQDhhz67atj/";
 
     openssh.authorizedKeys.keys = [
@@ -41,15 +35,12 @@
     ];
   };
 
-  # Left deliberately untouched, both from nixos-sheng's hardware.nix:
-  #
-  #   services.getty.autologinUser = "root"
-  #   users.users.root.hashedPassword  (the password is "password")
-  #
-  # Those are bring-up defaults and they are not safe on a daily driver,
-  # but overriding them needs mkForce and a password for ${setup.primaryUser}
-  # that exists before first boot -- get that wrong and the tablet has no
-  # way in at all. users.mutableUsers is true, so the intended fix is one
-  # `passwd` per user over the serial console after the first flash, then
-  # mkForce the autologin off here.
+  # nixos-sheng ships drivers only, so the root password and autologin are
+  # ours now. Bring-up defaults, NOT safe: the hash is "password" and tty1
+  # logs in as root without asking.
+  users.users.root.hashedPassword = "$6$e/k7.7lhroPMA6hy$ysO.xH9hAm5y0NCdKQs4AAT0MQFy0kP7F6XpVIryRAN1wNHReXXHx21zdonHiXwKuynriN9UA.OQDhhz67atj/";
+  users.mutableUsers = true;
+
+  # Set here, not as a runtime drop-in, which systemd applies first.
+  services.getty.autologinUser = "root";
 }

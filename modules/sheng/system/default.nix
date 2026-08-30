@@ -5,11 +5,8 @@
     ./users-and-groups.nix
   ];
 
-  # No hardware-configuration.nix or networking.nix here, unlike pc:
-  # nixos-sheng's modules/hardware.nix owns the device tree, kernel,
-  # kernel params, root filesystem, firmware and NetworkManager, and
-  # modules/extlinux.nix owns the bootloader. Duplicating any of it here
-  # would fight those modules rather than extend them.
+  # No hardware-configuration.nix or networking.nix: nixos-sheng owns the
+  # kernel, device tree, kernel params, rootfs, firmware and bootloader.
 
   system.activationScripts.setupSystemFlake = {
     text = ''

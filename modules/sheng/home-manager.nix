@@ -14,6 +14,4 @@
 
   home-manager.users.sushy = import ./users/sushy/configuration.nix;
 
-  # No services.emacs here, unlike pc: it is a user service that pulls a
-  # large closure onto a device with one partition.
 }
