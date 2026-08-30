@@ -47,12 +47,17 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    nixos-sheng = {
+      url = "github:sushydev/nixos-sheng";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     dotfiles = {
-      url = "path:/Users/work/Documents/Projects/dotfiles";
-      #url = "https://github.com/sushydev/dotfiles";
-      #type = "git";
-      #ref = "main";
-      #submodules = true;
+      #url = "path:/Users/work/Documents/Projects/dotfiles";
+      url = "https://github.com/sushydev/dotfiles";
+      type = "git";
+      ref = "main";
+      submodules = true;
     };
 
     claude-lite = {
@@ -70,6 +75,7 @@
       plasma-manager,
       nix-darwin,
       nix-plist-manager,
+      nixos-sheng,
       ...
     }@inputs:
     let
@@ -151,10 +157,63 @@
           ./modules/pulsar/home-manager.nix
         ];
       };
+
+      # Xiaomi Pad 6S Pro. Built through nixos-sheng.lib.shengSystem rather
+      # than nixpkgs.lib.nixosSystem: that wrapper pins aarch64-linux, adds
+      # the sheng overlay (shengKernel, shengPackages), sets allowUnfree for
+      # the QTEE and firmware blobs, and imports nixos-sheng's own modules.
+      # It takes modules/specialArgs but not a whole nixosSystem attrset,
+      # which is why this one is not shaped like the three above.
+      systemSheng = {
+        modules = [
+          ./modules/sheng/configuration.nix
+
+          home-manager.nixosModules.home-manager
+          ./modules/sheng/home-manager.nix
+        ];
+        specialArgs = {
+          inherit inputs;
+          setup = {
+            primaryUser = "sushy";
+            managedUsers = [ systemSheng.specialArgs.setup.primaryUser ];
+            managedUsersAndRoot = [ "root" ] ++ systemSheng.specialArgs.setup.managedUsers;
+            nixGroupMembers = [ systemSheng.specialArgs.setup.primaryUser ];
+            nixGroupName = "nix";
+            nixGroupId = 101;
+            systemFlakePath = "/etc/nixos";
+          };
+        };
+      };
+
+      shengImageScript = nixpkgs.legacyPackages.${systemQuasar.system}.writeShellApplication {
+        name = "sheng-image";
+        runtimeInputs = with nixpkgs.legacyPackages.${systemQuasar.system}; [
+          coreutils
+          gnutar
+        ];
+        text = builtins.readFile ./scripts/sheng-image;
+      };
     in
     {
       nixosConfigurations.pc = nixpkgs.lib.nixosSystem systemPc;
       darwinConfigurations.quasar = nix-darwin.lib.darwinSystem systemQuasar;
       nixosConfigurations.pulsar = nixpkgs.lib.nixosSystem systemPulsar;
+      nixosConfigurations.sheng = nixos-sheng.lib.shengSystem systemSheng;
+
+      # The rootfs image itself. Only buildable on an aarch64-linux builder;
+      # from this Mac use `nix run .#sheng`, which drives the container.
+      packages.aarch64-linux.sheng = self.nixosConfigurations.sheng.config.system.build.shengImage;
+
+      # U-Boot, straight from nixos-sheng -- it takes nothing from any host
+      # config, so it is re-exported rather than rebuilt here.
+      packages.aarch64-linux.sheng-u-boot = nixos-sheng.packages.aarch64-linux.u-boot;
+
+      apps.${systemQuasar.system} = {
+        sheng = {
+          type = "app";
+          program = nixpkgs.lib.getExe shengImageScript;
+        };
+      }
+      // nixos-sheng.apps.${systemQuasar.system};
     };
 }

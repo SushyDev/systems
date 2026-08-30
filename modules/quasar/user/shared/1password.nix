@@ -6,14 +6,14 @@
 }:
 let
   isOnePasswordGui = pkg: pkg.pname or "" == "1password";
-  inSystemPackages = lib.any isOnePasswordGui systemConfig.environment.systemPackages;
-  inHomePackages = lib.any isOnePasswordGui config.home.packages;
-  hasOnePassword = inSystemPackages || inHomePackages;
-  onePasswordAppSource =
-    if inSystemPackages then
-      "/Applications/Nix Apps/1Password.app"
-    else
-      "${config.home.homeDirectory}/Applications/Home Manager Apps/1Password.app";
+  onePasswordPkg = lib.findFirst isOnePasswordGui (
+    lib.findFirst isOnePasswordGui null config.home.packages
+  ) systemConfig.environment.systemPackages;
+  hasOnePassword = onePasswordPkg != null;
+  # Link straight to the package's Nix store path rather than through the
+  # "/Applications/Nix Apps" or "~/Applications/Home Manager Apps" indirection,
+  # so this doesn't depend on nix-darwin/home-manager's own app-linking step.
+  onePasswordAppSource = "${onePasswordPkg}/Applications/1Password.app";
   onePasswordGroupContainer = "${config.home.homeDirectory}/Library/Group Containers/2BUA8C4S2C.com.1password";
 in
 lib.mkIf hasOnePassword {
@@ -37,8 +37,8 @@ lib.mkIf hasOnePassword {
   };
 
   # 1Password expects to live at exactly /Applications/1Password.app (e.g. for
-  # browser extension pairing), but it only gets linked into "/Applications/Nix Apps"
-  # (system config) or "~/Applications/Home Manager Apps" (home config).
+  # browser extension pairing). Force this on every activation so it survives
+  # anything else touching /Applications/1Password.app between switches.
   home.activation.link1PasswordApp = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     $DRY_RUN_CMD /bin/ln -sfn "${onePasswordAppSource}" "/Applications/1Password.app"
   '';

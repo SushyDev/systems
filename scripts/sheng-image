@@ -1,0 +1,47 @@
+# Build the sheng rootfs image and copy it out of the container.
+#
+# The image is aarch64-linux and nothing here cross-compiles, so it cannot
+# be built on this Mac directly. nixos-sheng ships a container for exactly
+# this; its own `builder` script only mounts the nixos-sheng checkout, so
+# this mounts /etc/nixdarwin instead and shares the same /nix volume, which
+# is what makes a rebuild reuse everything the builder already has.
+#
+#   nix run .#sheng            -> ./result-sheng/sheng-rootfs.sparse.img
+#   nix run .#sheng -- ./out   -> ./out/sheng-rootfs.sparse.img
+#
+# boot.img is deliberately not built here: it comes from nixos-sheng#u-boot
+# and does not depend on any NixOS host config, so it is identical whatever
+# this flake says.
+flake_dir="${SHENG_FLAKE_DIR:-/etc/nixdarwin}"
+volume="${SHENG_NIX_VOLUME:-docker_nix-store}"
+dest="${1:-./result-sheng}"
+attr='path:/work#nixosConfigurations.sheng.config.system.build.shengImage'
+
+command -v docker >/dev/null || {
+  echo "docker is not on PATH" >&2
+  exit 1
+}
+
+# Build logs go to stderr, the store path to stdout, so this stays parseable
+# while remaining watchable.
+out="$(docker run --rm \
+  -v "$volume":/nix \
+  -v "$flake_dir":/work:ro \
+  nixos/nix \
+  nix --extra-experimental-features 'nix-command flakes' \
+      build "$attr" --print-out-paths --no-link | tail -1)"
+
+[ -n "$out" ] || {
+  echo "build produced no output path" >&2
+  exit 1
+}
+
+# tar rather than docker cp: store paths are read-only, and cp recreates
+# those modes as it goes and then cannot write into the directory it made.
+mkdir -p "$dest"
+docker run --rm -v "$volume":/nix nixos/nix \
+  sh -c "cd '$out' && tar -cf - ." |
+  tar -xf - -C "$dest" --no-same-permissions
+chmod -R u+w "$dest"
+
+echo "$dest"

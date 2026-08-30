@@ -9,7 +9,7 @@
   imports = [
     inputs.dotfiles.homeManagerModules.default
     # inputs.plasma-manager.homeModules.plasma-manager
-    ../../shared/user/ssh.nix
+    ../../../shared/user/ssh.nix
   ];
 
   dotfiles = {
