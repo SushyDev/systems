@@ -354,15 +354,16 @@
         "u-boot-src": "u-boot-src"
       },
       "locked": {
-        "lastModified": 1787524651,
-        "narHash": "sha256-CVd/avXnsBCfUCcbjI5+AsdXiR9nWZCT7q7lpOYo7gs=",
+        "lastModified": 1788099282,
+        "narHash": "sha256-sAsXwdFQdBTK9aWnIHl8FO3picEs6DmAwp7tAW+RBgs=",
         "owner": "sushydev",
         "repo": "nixos-sheng",
-        "rev": "28cb925c04e3e17189c3089714366d4912ac297a",
+        "rev": "d4d0929e9f446e25daacb9ca29ff6315d38fe685",
         "type": "github"
       },
       "original": {
         "owner": "sushydev",
+        "ref": "feature/update-kernel",
         "repo": "nixos-sheng",
         "type": "github"
       }

@@ -48,7 +48,7 @@
     };
 
     nixos-sheng = {
-      url = "github:sushydev/nixos-sheng";
+      url = "github:sushydev/nixos-sheng?ref=feature/update-kernel";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

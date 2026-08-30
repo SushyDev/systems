@@ -37,6 +37,8 @@
     #
     # ddev and dbeaver-bin do build for aarch64, but they are heavy local
     # dev tooling that wants a docker daemon; left off a tablet on purpose.
+
+    pkgs.claude-code
   ];
 
   fonts.packages = [
