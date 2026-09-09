@@ -24,6 +24,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    sops-nix = {
+      url = "git+https://github.com/Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     plasma-manager = {
       url = "github:nix-community/plasma-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -76,6 +81,7 @@
       nix-darwin,
       nix-plist-manager,
       nixos-sheng,
+      sops-nix,
       ...
     }@inputs:
     let
@@ -150,6 +156,8 @@
           determinate.nixosModules.default
           disko.nixosModules.disko
           ./modules/pulsar/disko/btrfs-raid1.nix
+
+          sops-nix.nixosModules.sops
 
           ./modules/pulsar/configuration.nix
 

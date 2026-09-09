@@ -1,0 +1,29 @@
+# --- SOPS encryption recipients
+#
+# Two age recipients, deliberately:
+#
+#   admin  -- the master/disaster-recovery key. Its private half lives in
+#             1Password (item "pulsar age admin"). It is what lets you EDIT
+#             secrets, and what lets you decrypt them onto a REBUILT host whose
+#             SSH host key is different. If this is lost after secrets have been
+#             encrypted, they are unrecoverable. Back it up before relying on it.
+#
+#   pulsar -- derived from the host's existing /etc/ssh/ssh_host_ed25519_key via
+#             ssh-to-age. sops-nix uses it to decrypt into /run/secrets at
+#             activation. Nothing new has to be stored anywhere for this one --
+#             it is the host key the machine already had.
+#
+# Regenerate the host recipient after a reinstall with:
+#   ssh-to-age -i /etc/ssh/ssh_host_ed25519_key.pub
+# then `sops updatekeys modules/pulsar/secrets/pulsar.yaml`.
+
+keys:
+  - &admin age159kua8n7d34ha4p0wm50ugphanr7g095c76wyp87je42jgctpcpsv22d6v
+  - &pulsar age16hsl25fhxhuxuulvltqjflpsjuk3gpxz5gw59ts2xqmqu6ptl4ks022vss
+
+creation_rules:
+  - path_regex: modules/pulsar/secrets/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *admin
+          - *pulsar

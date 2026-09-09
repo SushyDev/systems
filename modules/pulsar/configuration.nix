@@ -14,6 +14,7 @@
     ./security.nix
     ./services.nix
     ./networking.nix
+    ./secrets.nix
     ./k3s.nix
 
     ./system/default.nix
