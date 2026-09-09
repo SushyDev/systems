@@ -37,6 +37,22 @@
       # The single alerting channel. Rendered to /run/secrets/... and read by
       # systemd OnFailure= handlers.
       "alerting/discord_webhook" = { };
+
+      # The age identity Flux's kustomize-controller uses to decrypt SOPS files
+      # in the GitOps repo. It is a THIRD key, distinct from the two in
+      # ../../.sops.yaml:
+      #
+      #   admin   -- edits this file, recovers it onto a rebuilt host, in 1Password
+      #   pulsar  -- the host's ssh_host_ed25519_key, decrypts this file at activation
+      #   cluster -- the key below, decrypts secrets in the GitOps repo
+      #
+      # Layering it this way means the cluster key is itself protected by the
+      # host key, so it never exists in plaintext outside /run, and a compromise
+      # of the cluster does not hand over the ability to decrypt host secrets.
+      "flux/age_key" = { };
+      "flux/deploy_key_b64" = { };
+      "flux/deploy_key_pub_b64" = { };
+      "flux/github_known_hosts_b64" = { };
     };
   };
 }
