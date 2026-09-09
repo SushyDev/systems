@@ -204,6 +204,11 @@ in
     ];
   };
 
+  # mydumper's --compress=zstd shells out to the `zstd` binary rather than
+  # linking libzstd, and the restic unit's PATH does not include it. Without
+  # this the job dies with "zstd was not found in PATH".
+  systemd.services.restic-backups-magento-db.path = [ pkgs.zstd ];
+
   # Each job reports its own failure. Without this these are as silent as Flux
   # was for 150 days.
   systemd.services.restic-backups-magento-db.unitConfig.OnFailure = "${notifyUnit}%n.service";
