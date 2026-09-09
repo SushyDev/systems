@@ -17,6 +17,7 @@
     ./secrets.nix
     ./backups.nix
     ./k3s.nix
+    ./flux.nix
 
     ./system/default.nix
     ../shared/oxidation.nix
