@@ -18,6 +18,7 @@
     ./backups.nix
     ./k3s.nix
     ./flux.nix
+    ./falco.nix
 
     ./system/default.nix
     ../shared/oxidation.nix

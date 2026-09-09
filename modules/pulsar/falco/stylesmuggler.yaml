@@ -1,0 +1,107 @@
+# Falco rules for the StyleSmuggler / CVE-2026-75650 implant family.
+#
+# These detect what the malware DOES rather than where it currently lives, so
+# they survive the dropper rotating paths -- it has already moved between
+# ~/.local/share/.gvfsd/, ~/.cache/fontconfig/ and /tmp/.fc-<hex>/ across
+# observed variants.
+#
+# Kept as a plain YAML file rather than inline Nix: the k3s module serialises
+# chart values into a double-quoted YAML scalar containing JSON, and line
+# folding corrupts "\n" escapes that straddle the wrap column. This file is
+# mounted via its own ConfigMap instead.
+
+# NOTE: an earlier revision defined a `pulsar_web_user` macro scoped to uid 33.
+# It is deliberately gone: the rules below key on `user.uid != 0` instead, which
+# catches any non-root identity rather than only www-data, and Falco warns on
+# every startup about a macro that nothing references.
+
+# The fvs FUSE mount lives under /dev/shm and serves media files. It is never an
+# exec source, but exclude it explicitly so a later tweak cannot start alerting
+# on library reads.
+- macro: pulsar_fvs_mount
+  condition: (proc.exepath startswith "/dev/shm/fvs/")
+
+- rule: Binary executed from temp or cache directory
+  desc: >
+    StyleSmuggler drops its second stage into a temporary or cache directory and
+    executes it from there. Observed paths include /tmp/.fc-<hex>/fc-cache,
+    /tmp/.chrony-<hex>/chronyd and ~/.cache/fontconfig/fc-cache.
+  condition: >
+    spawned_process
+    and not pulsar_fvs_mount
+    and (proc.exepath startswith "/tmp/"
+    or proc.exepath startswith "/var/tmp/"
+    or proc.exepath startswith "/dev/shm/"
+    or proc.exepath contains "/.cache/fontconfig/"
+    or proc.exepath contains "/.local/share/.gvfsd/")
+  output: >
+    Binary executed from a temp or cache path (exe=%proc.exepath
+    cmd=%proc.cmdline user=%user.name uid=%user.uid parent=%proc.pname
+    container=%container.name image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, execution]
+
+- rule: System daemon name spawned by non-root user
+  desc: >
+    The implant masquerades as a kernel worker or a routine system daemon. A
+    real kworker is a kernel thread and always root; fc-cache or chronyd started
+    by the web-server user is not legitimate.
+  condition: >
+    spawned_process
+    and user.uid != 0
+    and (proc.name in (fc-cache, chronyd, gvfsd-user)
+    or proc.name contains "kworker")
+  output: >
+    Process masquerading as a system daemon started by a non-root user
+    (proc=%proc.name exe=%proc.exepath cmd=%proc.cmdline user=%user.name
+    uid=%user.uid parent=%proc.pname container=%container.name
+    image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, defense_evasion]
+
+- rule: Cron persistence written by non-root user
+  desc: >
+    The implant reinstalls itself from cron every five minutes. Nothing running
+    as the web-server user has any business writing a crontab. The host itself
+    runs no cron at all, so a hit here is either a container's own crond or an
+    intrusion.
+  condition: >
+    open_write
+    and user.uid != 0
+    and (fd.name startswith "/var/spool/cron/"
+    or fd.name startswith "/etc/cron"
+    or fd.name startswith "/etc/crontabs/")
+  output: >
+    Cron entry written by a non-root user (file=%fd.name proc=%proc.name
+    cmd=%proc.cmdline user=%user.name uid=%user.uid container=%container.name
+    image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, persistence]
+
+- rule: Outbound connection to known StyleSmuggler C2
+  desc: Published command-and-control endpoints for this campaign.
+  condition: >
+    outbound
+    and fd.sip in ("185.157.160.251", "99.84.67.186")
+  output: >
+    Outbound connection to a known C2 address (dest=%fd.sip:%fd.sport
+    proto=%fd.l4proto proc=%proc.name cmd=%proc.cmdline user=%user.name
+    container=%container.name image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, c2]
+
+- rule: Unexpected outbound NTP traffic
+  desc: >
+    The implant beacons over UDP/123 to NTP-impersonating hosts. Only the host
+    time daemon should speak NTP; a container doing so is not normal.
+  condition: >
+    outbound
+    and fd.l4proto = udp
+    and fd.sport = 123
+    and not proc.name in (systemd-timesyn, chronyd, ntpd, sntp)
+  output: >
+    Unexpected NTP traffic from a non-timekeeping process (dest=%fd.sip:%fd.sport
+    proc=%proc.name cmd=%proc.cmdline user=%user.name container=%container.name
+    image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, c2]
