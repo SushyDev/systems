@@ -15,7 +15,7 @@
       "docker"
       "media"
       "nix"
-      "kubernetes"
+      "k3s"
     ];
   };
 
@@ -26,5 +26,5 @@
   ];
 
   # Pre-set the KUBECONFIG environment variable for your shell
-  environment.variables.KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
+  environment.variables.KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
 }

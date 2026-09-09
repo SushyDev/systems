@@ -14,7 +14,7 @@
     ./security.nix
     ./services.nix
     ./networking.nix
-    ./kubernetes.nix
+    ./k3s.nix
 
     ./system/default.nix
     ../shared/oxidation.nix
