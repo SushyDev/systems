@@ -15,6 +15,7 @@
     ./services.nix
     ./networking.nix
     ./secrets.nix
+    ./backups.nix
     ./k3s.nix
 
     ./system/default.nix
