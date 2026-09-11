@@ -90,6 +90,10 @@
   priority: CRITICAL
   tags: [stylesmuggler, c2]
 
+# time.cloudflare.com. WARP syncs against these legitimately.
+- list: cloudflare_ntp_servers
+  items: ["162.159.200.1", "162.159.200.123"]
+
 - rule: Unexpected outbound NTP traffic
   desc: >
     The implant beacons over UDP/123 to NTP-impersonating hosts. Only the host
@@ -99,6 +103,8 @@
     and fd.l4proto = udp
     and fd.sport = 123
     and not proc.name in (systemd-timesyn, chronyd, ntpd, sntp)
+    and not (container.image.repository = "caomingjun/warp"
+             and fd.sip in (cloudflare_ntp_servers))
   output: >
     Unexpected NTP traffic from a non-timekeeping process (dest=%fd.sip:%fd.sport
     proc=%proc.name cmd=%proc.cmdline user=%user.name container=%container.name
