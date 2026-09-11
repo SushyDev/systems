@@ -111,3 +111,11 @@
     image=%container.image.repository)
   priority: CRITICAL
   tags: [stylesmuggler, c2]
+
+# NixOS activation reconciles users from /etc/shadow on every rebuild. Requires
+# the activate parent, so a bare `perl` reading shadow still alerts.
+- macro: user_known_read_sensitive_files_activities
+  condition: >
+    (proc.name = perl
+     and proc.pname = activate
+     and proc.cmdline contains "update-users-groups.pl")
