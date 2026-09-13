@@ -112,10 +112,61 @@
   priority: CRITICAL
   tags: [stylesmuggler, c2]
 
-# NixOS activation reconciles users from /etc/shadow on every rebuild. Requires
-# the activate parent, so a bare `perl` reading shadow still alerts.
+# Overrides upstream's (never_true) hook in "Read sensitive file untrusted".
+# Both clauses are host-only and pin the parent, so the same binary name run
+# from anywhere else still alerts.
 - macro: user_known_read_sensitive_files_activities
   condition: >
     (proc.name = perl
      and proc.pname = activate
      and proc.cmdline contains "update-users-groups.pl")
+    or
+    (proc.pname = systemd
+     and proc.exepath endswith "/lib/systemd/systemd-executor"
+     and fd.name in (systemd_pam_sensitive_files))
+
+# systemd-executor reads these when PAM opens a session -- every `systemd
+# --user` start, i.e. every SSH login, fires three of them. Matched by path
+# suffix rather than the full /nix/store path, so a systemd bump does not
+# silently re-enable the noise. Verified 2026-09-13: proc.name is the numeric
+# fd systemd passes as argv[0] ("18"), so it is useless for matching.
+- list: systemd_pam_sensitive_files
+  items: ["/etc/shadow", "/etc/pam.d/systemd-user", "/etc/pam.d/other"]
+
+
+########################################################################
+# Watchtower image churn -- two upstream rules, same 04:00 root cause
+########################################################################
+
+# Watchtower pulls on "0 0 4 * * *". While dockerd extracts a Debian-based
+# layer it opens that layer's own /var/log/{btmp,wtmp,faillog,lastlog,dpkg.log,
+# alternatives.log,fontconfig.log} with O_TRUNC. Falco renders those as bare
+# /var/log/... paths -- it cannot resolve the extraction dirfd back to the
+# overlay2 root -- so there is no path left to key on and the process identity
+# has to carry it. Upstream ships containerd_activities for exactly this case
+# but has no dockerd equivalent.
+#
+# Tradeoff, accepted deliberately: this does let the real dockerd truncate a
+# real host log unseen. It is pinned to the moby libexec path under a systemd
+# parent, so a dropped binary calling itself dockerd does not inherit it.
+- macro: allowed_clear_log_files
+  condition: >
+    (container.id = host
+     and proc.name = dockerd
+     and proc.pname = systemd
+     and proc.exepath contains "/libexec/docker/dockerd")
+
+# FlareSolverr ships /app/chromedriver in its image; undetected_chromedriver
+# rewrites it in place at every startup to strip the `cdc_` Selenium tells,
+# which lands it in the container's upper layer and trips is_exe_upper_layer.
+# Verified 2026-09-13 by diffing the running binary against a fresh pull of the
+# image: 379 bytes differ, all contiguous at one offset inside the cdc_ string
+# block, size unchanged. That is a string patch, not injected code.
+#
+# Scoped to that one exepath rather than adding the image to
+# known_drop_and_execute_containers, so any OTHER dropped binary in this
+# container -- the case the rule exists for -- still alerts.
+- macro: known_drop_and_execute_activities
+  condition: >
+    (container.image.repository = "ghcr.io/flaresolverr/flaresolverr"
+     and proc.exepath = /app/chromedriver)
