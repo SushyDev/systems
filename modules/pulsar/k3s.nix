@@ -49,6 +49,42 @@
       # Swap is enabled on this host (zramSwap + 31G disk swap); do not refuse
       # to start because of it. Matches the old kubelet --fail-swap-on=false.
       "--kubelet-arg=fail-swap-on=false"
+
+      # Prerequisite for encrypting Secrets at rest. NOT SUFFICIENT ON ITS OWN,
+      # and as of 2026-09-19 encryption is NOT actually active -- see below.
+      #
+      # Why it matters: the 19 Secrets in this cluster -- the Magento crypt key
+      # and DB password, the GHCR pull credentials, the Cloudflare tunnel token,
+      # the Falco Discord webhook -- sit base64-only in
+      # /var/lib/rancher/k3s/server/db/state.db, a plain SQLite file that the
+      # restic `configs` job backs up. Confirmed unencrypted: the datastore
+      # contains no `k8s:enc:` prefixes.
+      #
+      # This flag makes the apiserver load cred/encryption-config.json
+      # (verified: --encryption-provider-config is now on the kube-apiserver
+      # command line, with automatic-reload). Without it the server ignores the
+      # file entirely and reports "Disabled, no configuration file found".
+      #
+      # The remaining step -- `k3s secrets-encrypt enable`, which swaps the
+      # config's `identity` provider for an AES key -- FAILS on k3s
+      # v1.35.7+k3s1 here:
+      #
+      #   Put "https://127.0.0.1:6443/v1-k3s/encrypt/config": EOF
+      #
+      # with nothing logged server-side, with and without --token. So the
+      # config still reads `{"providers":[{"identity":{}}]}`, which is a no-op:
+      # behaviour is exactly as it was before this flag, and nothing is at risk.
+      #
+      # Deliberately NOT worked around by hand-writing an AES provider into
+      # that file: k3s reconciles it against its own datastore state, and if it
+      # reverted the file after secrets had been written under a key it no
+      # longer knew, every Secret in the cluster would become unreadable and
+      # the store would lose its database credentials. Not worth it on a live
+      # shop to close an at-rest gap that only matters for datastore backups.
+      #
+      # To finish: resolve the CLI failure (k3s upstream issue), then
+      # `k3s secrets-encrypt enable && k3s secrets-encrypt reencrypt`.
+      "--secrets-encryption"
     ];
   };
 
