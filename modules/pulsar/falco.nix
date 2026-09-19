@@ -22,6 +22,8 @@ let
       echo 'data:'
       echo '  pulsar-stylesmuggler.yaml: |'
       ${pkgs.gnused}/bin/sed 's/^/    /' ${./falco/stylesmuggler.yaml}
+      echo '  pulsar-magento-webshell.yaml: |'
+      ${pkgs.gnused}/bin/sed 's/^/    /' ${./falco/magento-webshell.yaml}
     } > $out
   '';
 in

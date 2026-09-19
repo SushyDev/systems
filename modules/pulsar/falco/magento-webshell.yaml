@@ -1,0 +1,132 @@
+# Falco rules for webshells in the Magento media tree.
+#
+# Written 2026-09-19 after the SECOND webshell incident on this host:
+#
+#   2026-09-09  PHP webshells in pub/media/custom_options/quote/
+#   2026-09-10  50 GIF/PHP polyglots in pub/media/customer_address/a/v/,
+#               written over three days, found ten days later by accident
+#               while chasing an unrelated indexing bug
+#
+# Neither was detected. Both were found by hand. These rules close that.
+#
+# The polyglots are why rule 2 alone is not enough: they are valid GIF files
+# with PHP appended and a .gif extension, so nothing keyed on a PHP file
+# extension would have seen them. Falco cannot inspect file contents, so the
+# coverage here is deliberately layered -- catch the drop by location, and
+# catch the execution by behaviour, so a variant has to evade both.
+
+# Magento's media directories that exist to hold customer-supplied files and
+# are never legitimately served or executed. nginx already denies all of them;
+# a write here is either an unused feature suddenly in use, or an upload
+# primitive being exercised. Both are worth a look.
+#
+#   /pub/media/customer_address/   <- the 2026-09-10 polyglots
+#   /pub/media/custom_options/     <- the 2026-09-09 webshells
+#   /pub/media/customer/
+#   /pub/media/downloadable/
+#   /pub/media/import/
+#
+# Kept as a comment rather than a `list`: the conditions below need suffix and
+# substring matching, which `in (list)` does not do, so a list here would sit
+# unreferenced and Falco would warn about it on every startup.
+
+# setup:upgrade drops a deny-all .htaccess into each media directory on every
+# run, which would otherwise make rule 3 fire on every migrate Job.
+- macro: magento_media_htaccess_write
+  condition: (fd.name endswith "/.htaccess")
+
+########################################################################
+# 1. Execution -- the layer that does not care how the file got there
+########################################################################
+
+# The serving container runs php-fpm and nothing else. It has no cron, no
+# shell-outs, no maintenance scripts: `cron` and the queue consumers are
+# separate workloads running the php CLI, and those legitimately spawn
+# processes, so this is pinned to php-fpm as the parent rather than php.
+#
+# Every payload recovered on 2026-09-12 tried shell_exec, exec, system,
+# passthru, proc_open and popen in turn. All six land here.
+- rule: Shell spawned by Magento php-fpm
+  desc: >
+    A shell was executed with php-fpm as its parent. The Magento serving
+    process never does this; a webshell or an RCE payload does it immediately.
+  condition: >
+    spawned_process
+    and proc.pname = "php-fpm"
+    and proc.name in (shell_binaries)
+  output: >
+    Shell spawned by Magento php-fpm (shell=%proc.name cmd=%proc.cmdline
+    exe=%proc.exepath parent=%proc.pname user=%user.name uid=%user.uid
+    container=%container.name image=%container.image.repository
+    k8s_pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [magento, webshell, execution]
+
+# Same idea one step out: the payloads run `id -u; hostname; pwd`. If the shell
+# itself is ever whitelisted or evaded, the recon binaries still surface.
+- rule: Recon binary executed under Magento php-fpm
+  desc: >
+    A host-reconnaissance binary ran somewhere beneath php-fpm. This is the
+    exact command carried by the polyglots recovered on 2026-09-12
+    (`id -u; hostname; pwd`).
+  condition: >
+    spawned_process
+    and proc.aname[2] = "php-fpm"
+    and proc.name in (id, hostname, whoami, uname, ifconfig, netstat, ss)
+  output: >
+    Reconnaissance binary executed under Magento php-fpm (proc=%proc.name
+    cmd=%proc.cmdline parent=%proc.pname user=%user.name uid=%user.uid
+    container=%container.name image=%container.image.repository
+    k8s_pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [magento, webshell, discovery]
+
+########################################################################
+# 2. The classic drop -- a PHP file written into the media tree
+########################################################################
+
+- rule: PHP file written into Magento media
+  desc: >
+    A file with a PHP extension was created under pub/media. Nothing Magento
+    does writes executable PHP there; product images, imports and generated
+    assets are all non-PHP. This is the 2026-09-09 incident's shape.
+  condition: >
+    open_write
+    and fd.name contains "/pub/media/"
+    and (fd.name endswith ".php" or fd.name endswith ".phtml"
+      or fd.name endswith ".php3" or fd.name endswith ".php4"
+      or fd.name endswith ".php5" or fd.name endswith ".php7"
+      or fd.name endswith ".phps" or fd.name endswith ".phar"
+      or fd.name endswith ".inc")
+  output: >
+    PHP file written into the Magento media tree (file=%fd.name proc=%proc.name
+    cmd=%proc.cmdline user=%user.name uid=%user.uid container=%container.name
+    image=%container.image.repository k8s_pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [magento, webshell, filesystem]
+
+########################################################################
+# 3. The polyglot drop -- caught by location, since content is invisible
+########################################################################
+
+- rule: Write into a never-served Magento media directory
+  desc: >
+    A file was written into one of the media directories that exist only to
+    hold customer-supplied uploads and are denied by nginx. The 2026-09-10
+    polyglots landed in pub/media/customer_address/ and carried a .gif
+    extension, so only their location gave them away.
+  condition: >
+    open_write
+    and not magento_media_htaccess_write
+    and (fd.name contains "/pub/media/customer_address/"
+      or fd.name contains "/pub/media/custom_options/"
+      or fd.name contains "/pub/media/customer/"
+      or fd.name contains "/pub/media/downloadable/"
+      or fd.name contains "/pub/media/import/")
+  output: >
+    Write into a never-served Magento media directory (file=%fd.name
+    proc=%proc.name cmd=%proc.cmdline user=%user.name uid=%user.uid
+    container=%container.name image=%container.image.repository
+    k8s_pod=%k8s.pod.name)
+  priority: WARNING
+  tags: [magento, webshell, filesystem]
