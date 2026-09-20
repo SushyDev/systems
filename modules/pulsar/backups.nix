@@ -189,6 +189,11 @@ in
       "**/.git"
       "**/result"
       "/home/sushy/docker/appie-goossens-m2/dump"
+
+      # Hand-taken dumps land here before an upgrade or a risky change. They
+      # were outside every restic path until 2026-09-20, so the one copy of a
+      # pre-upgrade database sat unversioned on the same array as the database.
+      "/home/sushy/backups"
     ];
 
     timerConfig = {
@@ -204,6 +209,68 @@ in
     ];
   };
 
+  # --- lina-costea: WordPress database and uploads
+  #
+  # This had NO backup coverage at all until 2026-09-20 -- a full site, its
+  # database and 97 MB of uploads, protected by nothing. The scope note at the
+  # top of this file said "WordPress when it lands"; it landed.
+  #
+  # Unlike Magento this one lives in k3s rather than compose, so the database is
+  # reached with kubectl exec and the uploads come straight off the local-path
+  # volume on disk.
+  #
+  # The uploads path is resolved by glob rather than written out: local-path
+  # names its directories <pvc-uid>_<namespace>_<claim>, and the uid changes if
+  # the claim is ever recreated. A hardcoded path would keep "succeeding" while
+  # silently backing up a directory that no longer exists.
+  services.restic.backups.lina-costea = common // {
+    paths = [ "${dumpDir}/lina-db" ];
+
+    dynamicFilesFrom = ''
+      ${pkgs.findutils}/bin/find /var/lib/rancher/k3s/storage \
+        -maxdepth 1 -name '*_lina-costea_lina-uploads'
+    '';
+
+    backupPrepareCommand = ''
+      set -euo pipefail
+      export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+      K=${pkgs.kubectl}/bin/kubectl
+
+      if ! $K -n lina-costea get pod lina-db-0 >/dev/null 2>&1; then
+        echo "WARNING: lina-db-0 not present -- no dump taken this run."
+        exit 0
+      fi
+
+      ${pkgs.coreutils}/bin/rm -rf ${dumpDir}/lina-db
+      ${pkgs.coreutils}/bin/mkdir -p ${dumpDir}/lina-db
+
+      # --single-transaction so InnoDB is consistent without a global read lock.
+      # The password is read inside the pod from its own environment rather than
+      # passed on our argv, where the process list is world-readable.
+      $K -n lina-costea exec lina-db-0 -- sh -c \
+        'mariadb-dump --single-transaction --quick --routines --triggers --events \
+           -u root -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' \
+        | ${pkgs.gzip}/bin/gzip > ${dumpDir}/lina-db/lina.sql.gz
+
+      # An empty or truncated dump is worse than none, because it looks like a
+      # backup. Fail the run instead.
+      if ! ${pkgs.gzip}/bin/gzip -t ${dumpDir}/lina-db/lina.sql.gz; then
+        echo "ERROR: lina-costea dump is not valid gzip" >&2
+        exit 1
+      fi
+    '';
+
+    backupCleanupCommand = ''
+      ${pkgs.coreutils}/bin/rm -rf ${dumpDir}/lina-db
+    '';
+
+    timerConfig = {
+      OnCalendar = "03:45";
+      RandomizedDelaySec = "15m";
+      Persistent = true;
+    };
+  };
+
   # mydumper's --compress=zstd shells out to the `zstd` binary rather than
   # linking libzstd, and the restic unit's PATH does not include it. Without
   # this the job dies with "zstd was not found in PATH".
@@ -214,6 +281,7 @@ in
   systemd.services.restic-backups-magento-db.unitConfig.OnFailure = "${notifyUnit}%n.service";
   systemd.services.restic-backups-magento-media.unitConfig.OnFailure = "${notifyUnit}%n.service";
   systemd.services.restic-backups-configs.unitConfig.OnFailure = "${notifyUnit}%n.service";
+  systemd.services.restic-backups-lina-costea.unitConfig.OnFailure = "${notifyUnit}%n.service";
 
   # restic for manual snapshot/restore work; mydumper ships myloader, which is
   # what a restore actually uses.
