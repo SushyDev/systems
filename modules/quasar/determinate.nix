@@ -1,11 +1,10 @@
-{ setup, ... }:
+{ ... }:
 {
   determinateNix = {
     enable = true;
 
     customSettings = {
       experimental-features = [ "external-builders" ];
-      trusted-users = setup.managedUsersAndRoot;
       lazy-trees = true;
       max-jobs = 14;
       extra-substituters = [ "https://claude-code.cachix.org" ];

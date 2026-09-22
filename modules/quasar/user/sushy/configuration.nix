@@ -3,21 +3,24 @@
   inputs,
   lib,
   pkgs,
-  setup,
   ...
 }:
+let
+  traits = import ../../../traits { inherit lib; };
+in
 {
   imports = [
     inputs.nix-plist-manager.homeManagerModules.default
-    inputs.dotfiles.homeManagerModules.default
     ../shared/configuration.nix
-    ../shared/dotfiles.nix
     ../shared/nix-plist-manager.nix
-    ../../../shared/user/direnv.nix
-    ../../../shared/user/npm.nix
     ../../../shared/user/git.nix
-    ../../../shared/user/ssh.nix
-  ];
+  ]
+  ++ (with traits; [
+    useDirenv
+    useDotfiles
+    useNpm
+    useSsh
+  ]);
 
   home.packages = [
     #pkgs.discord-ptb

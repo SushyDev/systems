@@ -90,15 +90,6 @@
         system = "x86_64-linux";
         specialArgs = {
           inherit inputs;
-          setup = {
-            primaryUser = "sushy";
-            managedUsers = [ systemPc.specialArgs.setup.primaryUser ];
-            managedUsersAndRoot = [ "root" ] ++ systemPc.specialArgs.setup.managedUsers;
-            nixGroupMembers = [ systemPc.specialArgs.setup.primaryUser ];
-            nixGroupName = "nix";
-            nixGroupId = 101;
-            systemFlakePath = "/etc/nixos";
-          };
         };
         modules = [
           determinate.nixosModules.default
@@ -113,17 +104,6 @@
         system = "aarch64-darwin";
         specialArgs = {
           inherit inputs;
-          setup = {
-            managedUsers = [
-              "sushy"
-              "work"
-            ];
-            managedUsersAndRoot = systemQuasar.specialArgs.setup.managedUsers ++ [ "root" ];
-            nixGroupMembers = systemQuasar.specialArgs.setup.managedUsers;
-            nixGroupName = "nix";
-            nixGroupId = 502;
-            systemFlakePath = "/private/etc/nixdarwin";
-          };
         };
         modules = [
           ./modules/quasar/configuration.nix
@@ -144,15 +124,6 @@
         specialArgs = {
           inherit inputs;
           disko = disko;
-          setup = {
-            primaryUser = "sushy";
-            managedUsers = [ systemPulsar.specialArgs.setup.primaryUser ];
-            managedUsersAndRoot = [ "root" ] ++ systemPulsar.specialArgs.setup.managedUsers;
-            nixGroupMembers = [ systemPulsar.specialArgs.setup.primaryUser ];
-            nixGroupName = "nix";
-            nixGroupId = 502;
-            systemFlakePath = "/etc/nixos";
-          };
         };
         modules = [
           determinate.nixosModules.default
@@ -181,17 +152,16 @@
         ];
         specialArgs = {
           inherit inputs;
-          setup = {
-            primaryUser = "sushy";
-            managedUsers = [ systemSheng.specialArgs.setup.primaryUser ];
-            managedUsersAndRoot = [ "root" ] ++ systemSheng.specialArgs.setup.managedUsers;
-            nixGroupMembers = [ systemSheng.specialArgs.setup.primaryUser ];
-            nixGroupName = "nix";
-            nixGroupId = 101;
-            systemFlakePath = "/etc/nixos";
-          };
         };
       };
+
+      traitLib = import ./lib/traits { inherit (nixpkgs) lib; };
+      traits = import ./modules/traits { inherit (nixpkgs) lib; };
+      forEachSystem = nixpkgs.lib.genAttrs [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-linux"
+      ];
 
       shengImageScript = nixpkgs.legacyPackages.${systemQuasar.system}.writeShellApplication {
         name = "sheng-image";
@@ -221,7 +191,30 @@
           type = "app";
           program = nixpkgs.lib.getExe shengImageScript;
         };
+        traits = traitLib.mkTraitsApp {
+          pkgs = nixpkgs.legacyPackages.${systemQuasar.system};
+          configurations = self.nixosConfigurations // self.darwinConfigurations;
+        };
       }
       // nixos-sheng.apps.${systemQuasar.system};
+
+      checks = forEachSystem (
+        system:
+        traitLib.mkChecks {
+          inherit traits;
+          pkgs = nixpkgs.legacyPackages.${system};
+          specialArgs = { inherit inputs; };
+          nixos = {
+            evaluate = nixpkgs.lib.nixosSystem;
+            homeManager = home-manager.nixosModules.home-manager;
+            hostPlatform = "x86_64-linux";
+          };
+          darwin = {
+            evaluate = nix-darwin.lib.darwinSystem;
+            homeManager = home-manager.darwinModules.home-manager;
+            hostPlatform = "aarch64-darwin";
+          };
+        }
+      );
     };
 }

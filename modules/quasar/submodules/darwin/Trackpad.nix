@@ -1,7 +1,7 @@
 {
   self,
   lib,
-  setup,
+  config,
   ...
 }:
 {
@@ -82,7 +82,7 @@
           "UserPreferences" = 1;
           "version" = 12;
         };
-      }) setup.managedUsers
+      }) config.users.knownUsers
     );
   };
 }

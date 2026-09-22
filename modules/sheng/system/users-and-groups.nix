@@ -1,8 +1,8 @@
-{ setup, pkgs, ... }:
+{ pkgs, ... }:
 {
   users.defaultUserShell = pkgs.zsh;
 
-  users.users."${setup.primaryUser}" = {
+  users.users.sushy = {
     isNormalUser = true;
     extraGroups = [
       "wheel"

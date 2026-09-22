@@ -1,12 +1,12 @@
 {
   base,
   inputs,
+  lib,
   pkgs,
-  setup,
   ...
 }:
 let
-  traits = import ../traits;
+  traits = import ../traits { inherit lib; };
 in
 {
   imports = [
@@ -14,10 +14,8 @@ in
   ]
   ++ (with traits; [
     (useGroupOwnedFlake {
-      path = setup.systemFlakePath;
-      gid = setup.nixGroupId;
-      members = setup.nixGroupMembers;
-      group = setup.nixGroupName;
+      gid = 502;
+      path = "/private/etc/nixdarwin";
     })
     useNixSettings
     use1Password

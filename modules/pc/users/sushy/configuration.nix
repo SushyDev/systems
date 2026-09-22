@@ -2,17 +2,19 @@
   inputs,
   lib,
   pkgs,
-  setup,
   ...
 }:
+let
+  traits = import ../../../traits { inherit lib; };
+in
 {
   imports = [
-    inputs.dotfiles.homeManagerModules.default
     # inputs.plasma-manager.homeModules.plasma-manager
-    ../../../shared/user/ssh.nix
-  ];
-
-  dotfiles.enable = true;
+  ]
+  ++ (with traits; [
+    useDotfiles
+    useSsh
+  ]);
 
   # plasma = {
   #   enable = true;

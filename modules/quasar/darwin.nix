@@ -1,7 +1,6 @@
 {
   lib,
   pkgs,
-  setup,
   ...
 }:
 let
@@ -15,7 +14,10 @@ in
 {
   # Setup users
 
-  users.knownUsers = setup.managedUsers;
+  users.knownUsers = [
+    "sushy"
+    "work"
+  ];
 
   users.users.sushy = mkStandardUser "sushy" // {
     uid = 501;
@@ -31,7 +33,6 @@ in
 
   time.timeZone = "Europe/Amsterdam";
 
-  # system.primaryUser = lib.head setup.managedUsers;
   system.stateVersion = 25.11;
   system.startup.chime = false;
   networking.computerName = "quasar";

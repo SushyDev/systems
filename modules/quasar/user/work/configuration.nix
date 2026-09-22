@@ -3,23 +3,25 @@
   inputs,
   lib,
   pkgs,
-  setup,
-  systemConfig,
   ...
 }:
+let
+  traits = import ../../../traits { inherit lib; };
+in
 {
   imports = [
     inputs.nix-plist-manager.homeManagerModules.default
-    inputs.dotfiles.homeManagerModules.default
     ../shared/configuration.nix
-    ../shared/dotfiles.nix
     ../shared/nix-plist-manager.nix
     ../../../shared/user/git.nix
-    ../../../shared/user/npm.nix
-    ../../../shared/user/direnv.nix
-    ../../../shared/user/ssh.nix
-    # ../../../shared/user/ddev.nix
-  ];
+  ]
+  ++ (with traits; [
+    useDirenv
+    useDotfiles
+    useNpm
+    useSsh
+    # useDdev
+  ]);
 
   # programs.ssh = {
   #   includes = [

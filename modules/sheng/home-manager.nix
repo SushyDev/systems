@@ -1,7 +1,6 @@
 {
   config,
   inputs,
-  setup,
   pkgs,
   ...
 }:
@@ -9,7 +8,7 @@
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
   home-manager.extraSpecialArgs = {
-    inherit inputs setup;
+    inherit inputs;
   };
 
   home-manager.users.sushy = import ./users/sushy/configuration.nix;

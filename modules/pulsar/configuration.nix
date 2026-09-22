@@ -1,5 +1,4 @@
 {
-  setup,
   config,
   lib,
   inputs,
@@ -7,7 +6,7 @@
   ...
 }:
 let
-  traits = import ../traits;
+  traits = import ../traits { inherit lib; };
 in
 {
   imports = [
@@ -20,12 +19,7 @@ in
     ./system/default.nix
   ]
   ++ (with traits; [
-    (useGroupOwnedFlake {
-      path = setup.systemFlakePath;
-      gid = setup.nixGroupId;
-      members = setup.nixGroupMembers;
-      group = setup.nixGroupName;
-    })
+    (useGroupOwnedFlake { gid = 502; })
     useNixSettings
     useOxidation
     usePasswordlessSudo

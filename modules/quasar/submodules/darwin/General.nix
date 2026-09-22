@@ -1,7 +1,7 @@
 {
   self,
   lib,
-  setup,
+  config,
   ...
 }:
 {
@@ -28,7 +28,7 @@
           # I assume this turns off Siri Data collection just like with Spotlight above
           "Siri Data Sharing Opt-In Status" = 2; # todo nix plist manager
         };
-      }) setup.managedUsers
+      }) config.users.knownUsers
     );
   };
 }
