@@ -19,10 +19,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    sushy-lib = {
-      url = "github:sushydev/nix-lib";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
 
     plasma-manager = {
       url = "github:nix-community/plasma-manager";
@@ -76,84 +72,13 @@
     {
       self,
       nixpkgs,
-      disko,
-      determinate,
-      home-manager,
-      plasma-manager,
       nix-darwin,
-      nix-plist-manager,
       nixos-sheng,
       ...
     }@inputs:
     let
-      systemPc = {
-        system = "x86_64-linux";
-        specialArgs = {
-          inherit inputs;
-        };
-        modules = [
-          determinate.nixosModules.default
-          ./modules/pc/configuration.nix
-
-          home-manager.nixosModules.home-manager
-          ./modules/pc/home-manager.nix
-        ];
-      };
-
-      systemQuasar = {
-        system = "aarch64-darwin";
-        specialArgs = {
-          inherit inputs;
-        };
-        modules = [
-          ./modules/quasar/configuration.nix
-
-          determinate.darwinModules.default
-          ./modules/quasar/determinate.nix
-
-          nix-plist-manager.darwinModules.default
-          ./modules/quasar/plist-manager.nix
-
-          home-manager.darwinModules.home-manager
-          ./modules/quasar/home-manager.nix
-        ];
-      };
-
-      systemPulsar = {
-        system = "x86_64-linux";
-        specialArgs = {
-          inherit inputs;
-          disko = disko;
-        };
-        modules = [
-          determinate.nixosModules.default
-          disko.nixosModules.disko
-          ./modules/pulsar/disko/btrfs-raid1.nix
-
-          ./modules/pulsar/configuration.nix
-
-          home-manager.nixosModules.home-manager
-          ./modules/pulsar/home-manager.nix
-        ];
-      };
-
-      # Xiaomi Pad 6S Pro. Built through nixos-sheng.lib.shengSystem rather
-      # than nixpkgs.lib.nixosSystem: that wrapper pins aarch64-linux, adds
-      # the sheng overlay (shengKernel, shengPackages), sets allowUnfree for
-      # the QTEE and firmware blobs, and imports nixos-sheng's own modules.
-      # It takes modules/specialArgs but not a whole nixosSystem attrset,
-      # which is why this one is not shaped like the three above.
-      systemSheng = {
-        modules = [
-          ./modules/sheng/configuration.nix
-
-          home-manager.nixosModules.home-manager
-          ./modules/sheng/home-manager.nix
-        ];
-        specialArgs = {
-          inherit inputs;
-        };
-      };
+      specialArgs = { inherit inputs; };
+      macPlatform = "aarch64-darwin";
 
       traitLib = import ./lib/traits { inherit (nixpkgs) lib; };
       traits = import ./modules/traits { inherit (nixpkgs) lib; };
@@ -163,9 +88,9 @@
         "x86_64-linux"
       ];
 
-      shengImageScript = nixpkgs.legacyPackages.${systemQuasar.system}.writeShellApplication {
+      shengImageScript = nixpkgs.legacyPackages.${macPlatform}.writeShellApplication {
         name = "sheng-image";
-        runtimeInputs = with nixpkgs.legacyPackages.${systemQuasar.system}; [
+        runtimeInputs = with nixpkgs.legacyPackages.${macPlatform}; [
           coreutils
           gnutar
         ];
@@ -173,10 +98,29 @@
       };
     in
     {
-      nixosConfigurations.pc = nixpkgs.lib.nixosSystem systemPc;
-      darwinConfigurations.quasar = nix-darwin.lib.darwinSystem systemQuasar;
-      nixosConfigurations.pulsar = nixpkgs.lib.nixosSystem systemPulsar;
-      nixosConfigurations.sheng = nixos-sheng.lib.shengSystem systemSheng;
+      nixosConfigurations = {
+        pc = nixpkgs.lib.nixosSystem {
+          inherit specialArgs;
+          modules = [ ./hosts/pc/configuration.nix ];
+        };
+
+        pulsar = nixpkgs.lib.nixosSystem {
+          inherit specialArgs;
+          modules = [ ./hosts/pulsar/configuration.nix ];
+        };
+
+        # Xiaomi Pad 6S Pro. shengSystem pins aarch64-linux, adds the sheng overlay,
+        # allows the unfree firmware blobs and imports nixos-sheng's own modules.
+        sheng = nixos-sheng.lib.shengSystem {
+          inherit specialArgs;
+          modules = [ ./hosts/sheng/configuration.nix ];
+        };
+      };
+
+      darwinConfigurations.quasar = nix-darwin.lib.darwinSystem {
+        inherit specialArgs;
+        modules = [ ./hosts/quasar/configuration.nix ];
+      };
 
       # The rootfs image itself. Only buildable on an aarch64-linux builder;
       # from this Mac use `nix run .#sheng`, which drives the container.
@@ -186,33 +130,32 @@
       # config, so it is re-exported rather than rebuilt here.
       packages.aarch64-linux.sheng-u-boot = nixos-sheng.packages.aarch64-linux.u-boot;
 
-      apps.${systemQuasar.system} = {
+      apps.${macPlatform} = {
         sheng = {
           type = "app";
           program = nixpkgs.lib.getExe shengImageScript;
         };
         traits = traitLib.mkTraitsApp {
-          pkgs = nixpkgs.legacyPackages.${systemQuasar.system};
+          pkgs = nixpkgs.legacyPackages.${macPlatform};
           configurations = self.nixosConfigurations // self.darwinConfigurations;
         };
       }
-      // nixos-sheng.apps.${systemQuasar.system};
+      // nixos-sheng.apps.${macPlatform};
 
       checks = forEachSystem (
         system:
         traitLib.mkChecks {
-          inherit traits;
+          inherit traits specialArgs;
           pkgs = nixpkgs.legacyPackages.${system};
-          specialArgs = { inherit inputs; };
           nixos = {
             evaluate = nixpkgs.lib.nixosSystem;
-            homeManager = home-manager.nixosModules.home-manager;
+            homeManager = traits.useHomeManager;
             hostPlatform = "x86_64-linux";
           };
           darwin = {
             evaluate = nix-darwin.lib.darwinSystem;
-            homeManager = home-manager.darwinModules.home-manager;
-            hostPlatform = "aarch64-darwin";
+            homeManager = traits.useHomeManager;
+            hostPlatform = macPlatform;
           };
         }
       );

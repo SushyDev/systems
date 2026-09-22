@@ -8,6 +8,7 @@ mkTraits {
   useDirenv = ./direnv;
   useDotfiles = ./dotfiles;
   useGroupOwnedFlake = ./group-owned-flake;
+  useHomeManager = ./home-manager;
   useKde = ./kde;
   useNixSettings = ./nix-settings;
   useNpm = ./npm;
