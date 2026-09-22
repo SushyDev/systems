@@ -11,6 +11,7 @@
   ];
 
   # nixpkgs.overlays = [ inputs.nix-darwin-apps.overlays.default ];
+  nixpkgs.overlays = [ inputs.claude-code.overlays.default ];
   nixpkgs.config.allowUnfree = true;
 
   # List packages installed in system profile. To search by name, run:
@@ -29,7 +30,7 @@
     pkgs.spotify
     pkgs.devenv
     pkgs.git-lfs
-    pkgs.claude-code
+    pkgs.claude-code # from inputs.claude-code overlay
     pkgs.dbeaver-bin
     pkgs.ghostty-bin
     pkgs.orbstack
@@ -41,7 +42,7 @@
     # # pkgs.google-chrome-canary
     # pkgs.setapp
 
-    inputs.claude-lite.packages.${pkgs.stdenv.hostPlatform.system}.claude-lite
+    # inputs.claude-lite.packages.${pkgs.stdenv.hostPlatform.system}.claude-lite
   ];
 
   fonts.packages = [

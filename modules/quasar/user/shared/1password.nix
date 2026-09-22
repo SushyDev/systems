@@ -40,6 +40,7 @@ lib.mkIf hasOnePassword {
   # browser extension pairing). Force this on every activation so it survives
   # anything else touching /Applications/1Password.app between switches.
   home.activation.link1PasswordApp = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    $DRY_RUN_CMD rm -rf "/Applications/1Password.app"
     $DRY_RUN_CMD /bin/ln -sfn "${onePasswordAppSource}" "/Applications/1Password.app"
   '';
 }

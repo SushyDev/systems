@@ -52,6 +52,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Tracks upstream Claude Code releases directly (nixpkgs lags behind) and
+    # bundles its own node. nixpkgs is deliberately NOT followed here: the
+    # upstream cachix cache only has hits for the flake's own pinned nixpkgs.
+    claude-code = {
+      url = "github:sadjow/claude-code-nix";
+    };
+
     dotfiles = {
       #url = "path:/Users/work/Documents/Projects/dotfiles";
       url = "https://github.com/sushydev/dotfiles";
@@ -60,9 +67,9 @@
       submodules = true;
     };
 
-    claude-lite = {
-      url = "path:/Users/work/Documents/Projects/claude-lite";
-    };
+    # claude-lite = {
+    #   url = "path:/Users/work/Documents/Projects/claude-lite";
+    # };
   };
 
   outputs =
