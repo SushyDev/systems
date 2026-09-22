@@ -13,7 +13,6 @@
     ../shared/configuration.nix
     ../shared/dotfiles.nix
     ../shared/nix-plist-manager.nix
-    ../shared/1password.nix
     ../../../shared/user/direnv.nix
     ../../../shared/user/npm.nix
     ../../../shared/user/git.nix

@@ -6,6 +6,9 @@
   pkgs,
   ...
 }:
+let
+  traits = import ../traits;
+in
 {
   imports = [
     ./packages.nix
@@ -15,11 +18,14 @@
     ./k3s.nix
 
     ./system/default.nix
-    ../shared/oxidation.nix
     ../shared/fonts.nix
     ./desktop-manager/kde.nix
     # ./hardening.nix
-  ];
+  ]
+  ++ (with traits; [
+    use1Password
+    useOxidation
+  ]);
 
   i18n.defaultLocale = "en_US.UTF-8";
   console.earlySetup = true;

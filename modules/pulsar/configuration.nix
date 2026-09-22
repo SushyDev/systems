@@ -6,6 +6,9 @@
   pkgs,
   ...
 }:
+let
+  traits = import ../traits;
+in
 {
   imports = [
     ./bootloader.nix
@@ -16,8 +19,10 @@
     ./kubernetes.nix
 
     ./system/default.nix
-    ../shared/oxidation.nix
-  ];
+  ]
+  ++ (with traits; [
+    useOxidation
+  ]);
 
   # --- System
   system.stateVersion = "25.05";

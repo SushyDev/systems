@@ -1,4 +1,4 @@
-{ self, pkgs, ... }:
+{ pkgs, ... }:
 {
   environment.shellAliases = {
     # find = "fd --hidden --follow --exclude .git";

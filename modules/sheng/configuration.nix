@@ -6,6 +6,9 @@
   pkgs,
   ...
 }:
+let
+  traits = import ../traits;
+in
 {
   imports = [
     ./packages.nix
@@ -14,10 +17,13 @@
     ./services.nix
 
     ./system/default.nix
-    ../shared/oxidation.nix
     ../shared/fonts.nix
     ./desktop-manager/kde.nix
-  ];
+  ]
+  ++ (with traits; [
+    use1Password
+    useOxidation
+  ]);
 
   networking.hostName = "sheng";
 

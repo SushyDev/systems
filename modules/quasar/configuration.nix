@@ -4,11 +4,17 @@
   pkgs,
   ...
 }:
+let
+  traits = import ../traits;
+in
 {
   imports = [
     ./darwin.nix
-    ../shared/oxidation.nix
-  ];
+  ]
+  ++ (with traits; [
+    use1Password
+    useOxidation
+  ]);
 
   # nixpkgs.overlays = [ inputs.nix-darwin-apps.overlays.default ];
   nixpkgs.overlays = [ inputs.claude-code.overlays.default ];
@@ -21,8 +27,6 @@
   in [
     pkgs.opencode
     pkgs.openssh
-    pkgs._1password-gui
-    pkgs._1password-cli
     pkgs.raycast
     #pkgs.obsidian
     pkgs.opencode
