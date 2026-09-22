@@ -102,11 +102,11 @@
     },
     "dotfiles": {
       "locked": {
-        "lastModified": 1789822409,
-        "narHash": "sha256-yo61VgljBSYXrZNUePt0QPAJiEEvIET0cLf1takFdc0=",
+        "lastModified": 1790110055,
+        "narHash": "sha256-VQtY7yo2yyBKdsFFJlILbDjnr+rAP+bRyZ6dvjqdw5I=",
         "ref": "main",
-        "rev": "867cb1412c2e416a8b243c7616b2c2bdfcf2a55e",
-        "revCount": 134,
+        "rev": "a61cbc2eb59f274de4d4dcc125e34338f4df4514",
+        "revCount": 135,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/sushydev/dotfiles"
@@ -307,11 +307,11 @@
         "u-boot-src": "u-boot-src"
       },
       "locked": {
-        "lastModified": 1788099282,
-        "narHash": "sha256-sAsXwdFQdBTK9aWnIHl8FO3picEs6DmAwp7tAW+RBgs=",
+        "lastModified": 1788129445,
+        "narHash": "sha256-g+HMo+CDRj8KqpzxARWDd3kXFVrF7YgdZ9zMpwmvFlA=",
         "owner": "sushydev",
         "repo": "nixos-sheng",
-        "rev": "d4d0929e9f446e25daacb9ca29ff6315d38fe685",
+        "rev": "e4cb1360aeb6c1d86552d88aa0caaf51cafacf5d",
         "type": "github"
       },
       "original": {

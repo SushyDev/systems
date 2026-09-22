@@ -58,10 +58,6 @@ in
       # TODO Only if directory exists
       eval "$(fnm env --use-on-cd)"
       # eval "$(/opt/homebrew/bin/brew shellenv)"
-
-      # 1Password plugin needs the completealiases to keep autocomplete working for the aliases it createas for each command
-      source $HOME/.config/op/plugins.sh
-      setopt completealiases
     '';
 
     sessionVariables = {

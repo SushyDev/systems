@@ -32,6 +32,14 @@ in
     inherit signer;
   };
 
+  # Shell plugins alias each command; completealiases keeps completion working for those aliases.
+  programs.zsh.initContent = ''
+    if [[ -f "$HOME/.config/op/plugins.sh" ]]; then
+      source "$HOME/.config/op/plugins.sh"
+      setopt completealiases
+    fi
+  '';
+
   home.sessionVariables = lib.mkIf isLinux {
     SSH_AUTH_SOCK = agentSocket;
   };
