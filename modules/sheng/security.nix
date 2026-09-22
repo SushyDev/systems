@@ -3,8 +3,6 @@
   ...
 }:
 {
-  security.sudo.wheelNeedsPassword = false;
-
   # RTKit for PipeWire real-time audio priority
   security.rtkit.enable = true;
 

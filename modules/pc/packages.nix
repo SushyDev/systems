@@ -37,6 +37,7 @@
       pkgs.mkcert
       pkgs.xdg-utils
       pkgs.dbeaver-bin
+      pkgs.kdePackages.calligra
       # pkgs.php83
       #pkgs.gcc
       #pkgs.i2c-tools

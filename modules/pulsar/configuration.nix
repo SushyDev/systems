@@ -14,7 +14,6 @@ in
     ./bootloader.nix
     ./packages.nix
     ./programs.nix
-    ./security.nix
     ./services.nix
     ./kubernetes.nix
 
@@ -22,6 +21,7 @@ in
   ]
   ++ (with traits; [
     useOxidation
+    usePasswordlessSudo
   ]);
 
   # --- System

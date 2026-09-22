@@ -22,7 +22,9 @@ in
   ]
   ++ (with traits; [
     use1Password
+    useKde
     useOxidation
+    usePasswordlessSudo
   ]);
 
   networking.hostName = "sheng";

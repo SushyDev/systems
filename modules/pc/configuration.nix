@@ -19,12 +19,13 @@ in
 
     ./system/default.nix
     ../shared/fonts.nix
-    ./desktop-manager/kde.nix
     # ./hardening.nix
   ]
   ++ (with traits; [
     use1Password
+    useKde
     useOxidation
+    usePasswordlessSudo
   ]);
 
   i18n.defaultLocale = "en_US.UTF-8";
