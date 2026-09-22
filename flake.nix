@@ -119,8 +119,9 @@
               "work"
             ];
             managedUsersAndRoot = systemQuasar.specialArgs.setup.managedUsers ++ [ "root" ];
+            nixGroupMembers = systemQuasar.specialArgs.setup.managedUsers;
             nixGroupName = "nix";
-            nixGroupId = 503;
+            nixGroupId = 502;
             systemFlakePath = "/private/etc/nixdarwin";
           };
         };

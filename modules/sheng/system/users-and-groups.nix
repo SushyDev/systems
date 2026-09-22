@@ -2,11 +2,6 @@
 {
   users.defaultUserShell = pkgs.zsh;
 
-  users.groups."${setup.nixGroupName}" = {
-    gid = setup.nixGroupId;
-    members = setup.nixGroupMembers;
-  };
-
   users.users."${setup.primaryUser}" = {
     isNormalUser = true;
     extraGroups = [

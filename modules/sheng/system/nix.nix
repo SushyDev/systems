@@ -1,7 +1,5 @@
 { setup, ... }:
 {
-  imports = [ ../../shared/nix.nix ];
-
   # Rebuilding the kernel on the tablet is the slow path this exists for.
   sheng.buildCache.enable = true;
 

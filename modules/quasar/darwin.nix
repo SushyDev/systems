@@ -11,21 +11,8 @@ let
     isHidden = false;
     shell = pkgs.zsh;
   };
-
-  darwinSwitch = "${lib.getExe pkgs.nix} run nix-darwin/master#darwin-rebuild -- switch --show-trace --flake ${setup.systemFlakePath}";
-  darwinUpdate = "${lib.getExe pkgs.nix} flake update --flake ${setup.systemFlakePath}";
 in
 {
-  # Setup groups
-
-  users.knownGroups = [ setup.nixGroupName ];
-
-  users.groups."${setup.nixGroupName}" = {
-    name = setup.nixGroupName;
-    gid = 502;
-    members = setup.managedUsers;
-  };
-
   # Setup users
 
   users.knownUsers = setup.managedUsers;
@@ -37,24 +24,6 @@ in
   users.users.work = mkStandardUser "work" // {
     uid = 503;
   };
-
-  # Setup basic nix conveniences
-
-  system.activationScripts.extraActivation.text = lib.mkAfter ''
-    /bin/mkdir -p ${setup.systemFlakePath}
-    /usr/sbin/chown -R root:nix ${setup.systemFlakePath}
-    /bin/chmod -R g+rwX ${setup.systemFlakePath}
-  '';
-
-  environment.shellAliases = {
-    darwin-switch = "sudo ${darwinSwitch}";
-    darwin-update = "${darwinUpdate}";
-  };
-
-  security.sudo.extraConfig = ''
-    %nix ALL=(ALL) NOPASSWD: ${lib.strings.replaceString "#" "\\#" darwinSwitch}
-    %nix ALL=(ALL) NOPASSWD: ${darwinUpdate}
-  '';
 
   # Other system settings
 

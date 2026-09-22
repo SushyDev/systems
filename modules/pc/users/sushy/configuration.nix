@@ -12,10 +12,7 @@
     ../../../shared/user/ssh.nix
   ];
 
-  dotfiles = {
-    enable = true;
-    systemFlakePath = setup.systemFlakePath;
-  };
+  dotfiles.enable = true;
 
   # plasma = {
   #   enable = true;

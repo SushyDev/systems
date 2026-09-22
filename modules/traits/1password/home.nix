@@ -42,11 +42,11 @@ in
     config = {
       Label = "com.1password.SSH_AUTH_SOCK";
       ProgramArguments = [
-        "/bin/sh"
+        (lib.getExe pkgs.bash)
         "-c"
         ''
-          mkdir -p "$(dirname "$SSH_AUTH_SOCK")"
-          /bin/ln -sf "${agentSocket}" "$SSH_AUTH_SOCK"
+          ${lib.getExe' pkgs.coreutils "mkdir"} -p "$(${lib.getExe' pkgs.coreutils "dirname"} "$SSH_AUTH_SOCK")"
+          ${lib.getExe' pkgs.coreutils "ln"} -sf "${agentSocket}" "$SSH_AUTH_SOCK"
         ''
       ];
       RunAtLoad = true;

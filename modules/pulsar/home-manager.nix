@@ -14,12 +14,7 @@
 
     programs.bash.enable = true;
 
-    programs.git = {
-      enable = true;
-      settings = {
-        safe.directory = setup.systemFlakePath;
-      };
-    };
+    programs.git.enable = true;
 
     # BuildX Patch until DDEV fixes their buildx plugin detection
     home.file.".docker/cli-plugins/docker-buildx".source =

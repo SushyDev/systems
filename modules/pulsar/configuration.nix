@@ -20,6 +20,13 @@ in
     ./system/default.nix
   ]
   ++ (with traits; [
+    (useGroupOwnedFlake {
+      path = setup.systemFlakePath;
+      gid = setup.nixGroupId;
+      members = setup.nixGroupMembers;
+      group = setup.nixGroupName;
+    })
+    useNixSettings
     useOxidation
     usePasswordlessSudo
   ]);
