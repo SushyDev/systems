@@ -40,6 +40,10 @@ in
   # rebuilds from the config it was flashed with.
   sheng.rootfs.etcNixosSource = inputs.self;
 
+  # zram sized to RAM, VM tuning for it, systemd-oomd and a deprioritised
+  # nix-daemon: 8G soldered is the constraint everything else works around.
+  sheng.performance.enable = true;
+
   # Qt Multimedia via GStreamer; without it Qt apps report "no camera detected".
   sheng.camera.qtGstreamerBackend = true;
 

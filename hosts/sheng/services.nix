@@ -19,10 +19,11 @@
 
   services.fstrim.enable = true;
 
-  # 8G soldered, no swap partition.
-  zramSwap.enable = true;
-  zramSwap.algorithm = "zstd";
-  services.earlyoom.enable = true;
+  # zram and OOM handling come from sheng.performance (configuration.nix).
+  # No earlyoom: it raced systemd-oomd for the same job.
+
+  # Wi-Fi only; NetworkManager pulls it in by default.
+  networking.modemmanager.enable = false;
 
   services.printing.enable = false;
   systemd.services.NetworkManager-wait-online.enable = false;

@@ -13,6 +13,9 @@
     settings.General.InputMethod = "qtvirtualkeyboard";
   };
 
+  # Discover can't manage a NixOS system; its notifier just sits in RAM.
+  environment.plasma6.excludePackages = [ pkgs.kdePackages.discover ];
+
   environment.systemPackages = [
     # maliit-keyboard is top-level, not under kdePackages.
     pkgs.maliit-keyboard

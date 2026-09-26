@@ -26,6 +26,9 @@ in
       InputMethod.value = "${pkgs.maliit-keyboard}/share/applications/com.github.maliit.keyboard.desktop";
       VirtualKeyboardEnabled.value = true;
     };
+
+    # The indexer's extractor alone held ~1.3G PSS on this device.
+    configFile.baloofilerc."Basic Settings".Indexing-Enabled.value = false;
   };
 
   home.stateVersion = "26.11";
