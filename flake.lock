@@ -354,11 +354,11 @@
         "u-boot-src": "u-boot-src"
       },
       "locked": {
-        "lastModified": 1788128257,
-        "narHash": "sha256-EKoryHFslPtv+pMTE8ZoKG4DhS8NYU10pGCVTzyG0AI=",
+        "lastModified": 1788129394,
+        "narHash": "sha256-g+HMo+CDRj8KqpzxARWDd3kXFVrF7YgdZ9zMpwmvFlA=",
         "owner": "sushydev",
         "repo": "nixos-sheng",
-        "rev": "b5a95f23c4a8de7da17b29cbe30ee640a50685da",
+        "rev": "64c836798d43813a12baa1e58c557e37ba9ccb94",
         "type": "github"
       },
       "original": {
