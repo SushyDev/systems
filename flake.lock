@@ -6,11 +6,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1790096491,
-        "narHash": "sha256-zeY26igEw0G1GnVe1fA8pa/+q7mxanzCUV91GUTedzk=",
+        "lastModified": 1790373703,
+        "narHash": "sha256-K4bkqmIIQraMokq3xAaZo/Vm/fptjLBA5ajXbUvzwOg=",
         "owner": "sadjow",
         "repo": "claude-code-nix",
-        "rev": "7e5f1c52ca206b2a3a535ec0e8f89bd1ae5f1afa",
+        "rev": "0bbe2588524a0280307c81c14fd5631c7cd277b0",
         "type": "github"
       },
       "original": {
@@ -184,11 +184,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790080548,
-        "narHash": "sha256-u4sa7RCbwvk8cZmAGs35F7o0h4IqDc3wsrrnjQvMumk=",
+        "lastModified": 1790365885,
+        "narHash": "sha256-iQ0ebhiVo64NktTnwft9hNxlFu4j5cvljVxyJaEVIP4=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "cbcbfa2778e0c5653ef349df3ebae8288efac3c0",
+        "rev": "7b4c5ec4bedaf1e062bbc1bcaeddbc6bd242aa1b",
         "type": "github"
       },
       "original": {
@@ -197,21 +197,38 @@
         "type": "github"
       }
     },
-    "home-manager_2": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_3"
-      },
+    "kernel-config": {
+      "flake": false,
       "locked": {
-        "lastModified": 1760295538,
-        "narHash": "sha256-SgnrSgyWj2ezIftKRpf+C6AdYqTkXN4iJA+JRQtdjrk=",
-        "owner": "nix-community",
-        "repo": "home-manager",
-        "rev": "904fa32d77609f281ef32d5209926d81848b687a",
+        "lastModified": 1789638571,
+        "narHash": "sha256-5u6IKBLok0IE6sRSWMjzdJ1+bEDodurRYXfyWHy4xrg=",
+        "owner": "ianchb",
+        "repo": "debian-sheng",
+        "rev": "60753c1fb711f79ff44aa683917c171f28784ca7",
         "type": "github"
       },
       "original": {
-        "id": "home-manager",
-        "type": "indirect"
+        "owner": "ianchb",
+        "repo": "debian-sheng",
+        "rev": "60753c1fb711f79ff44aa683917c171f28784ca7",
+        "type": "github"
+      }
+    },
+    "kernel-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789562726,
+        "narHash": "sha256-cll0sZv3fheM9PeleaK8lmdJQhj/rumMsVDwQ0842gM=",
+        "owner": "ianchb",
+        "repo": "sm8550-mainline",
+        "rev": "42f3b40c702abbc37c3a04c95af008cd283aeaf3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ianchb",
+        "ref": "7.2.6-mac",
+        "repo": "sm8550-mainline",
+        "type": "github"
       }
     },
     "nix": {
@@ -279,17 +296,16 @@
     },
     "nix-plist-manager": {
       "inputs": {
-        "home-manager": "home-manager_2",
         "nixpkgs": [
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1780429022,
-        "narHash": "sha256-PjyVi3OzypfHfLzNxCUJfiWy93FwpUqze02m6sVAbvQ=",
+        "lastModified": 1790283696,
+        "narHash": "sha256-c8J9LK40Mn+6UaS7sJZKSW28L2XkSivSF9dYl6bOeEc=",
         "owner": "sushydev",
         "repo": "nix-plist-manager",
-        "rev": "c7b708ed45f0d25c474e286320a8c9831c7c9a3b",
+        "rev": "f3ac4aaa9504e2f27da6314a47acea69a2e778e4",
         "type": "github"
       },
       "original": {
@@ -301,33 +317,35 @@
     },
     "nixos-sheng": {
       "inputs": {
+        "kernel-config": "kernel-config",
+        "kernel-src": "kernel-src",
         "nixpkgs": [
           "nixpkgs"
         ],
         "u-boot-src": "u-boot-src"
       },
       "locked": {
-        "lastModified": 1788129445,
-        "narHash": "sha256-g+HMo+CDRj8KqpzxARWDd3kXFVrF7YgdZ9zMpwmvFlA=",
+        "lastModified": 1790441322,
+        "narHash": "sha256-/yfF/3wJ7GU1yh0ooJ1tYaWIYO9BhFjAo4558npca/E=",
         "owner": "sushydev",
         "repo": "nixos-sheng",
-        "rev": "e4cb1360aeb6c1d86552d88aa0caaf51cafacf5d",
+        "rev": "57a41ba4d6d1ab0b0fe0ace9587a718a82319f28",
         "type": "github"
       },
       "original": {
         "owner": "sushydev",
-        "ref": "feature/update-kernel",
+        "ref": "feature/updates",
         "repo": "nixos-sheng",
         "type": "github"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1790055231,
-        "narHash": "sha256-QpXotokGh5eeMG1Njiuh27oP0rK6t5+cMp7ymXSs7mc=",
+        "lastModified": 1790238896,
+        "narHash": "sha256-ym4BG18Pu2awiJIehla1Lo9xiB2QYRcCzW3SB74gEBY=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "b6c98e9e6633ee64753b594ff4a5febf0367fc00",
+        "rev": "34ca302a9572963c02e385c056be37c85ff51b77",
         "type": "github"
       },
       "original": {
@@ -385,27 +403,11 @@
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1759831965,
-        "narHash": "sha256-vgPm2xjOmKdZ0xKA6yLXPJpjOtQPHfaZDRtH+47XEBo=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "c9b6fb798541223bbb396d287d16f43520250518",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_4": {
-      "locked": {
-        "lastModified": 1790046670,
-        "narHash": "sha256-MYiI+CzL0tuWgRPjGsKCDHqYs2T3OzMlMQWOYWG0qso=",
+        "lastModified": 1790323409,
+        "narHash": "sha256-VVTPf+Hyd5ebpjBMHmrLMSBIeW6ls48Bqtosj7CNKLA=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "6774f7bc253789b113a4f39285dc0fa100abeacc",
+        "rev": "e94cb152ed51bd6e24eb4a41f1460252beb52cd2",
         "type": "github"
       },
       "original": {
@@ -449,7 +451,7 @@
         "nix-darwin-apps": "nix-darwin-apps",
         "nix-plist-manager": "nix-plist-manager",
         "nixos-sheng": "nixos-sheng",
-        "nixpkgs": "nixpkgs_4",
+        "nixpkgs": "nixpkgs_3",
         "plasma-manager": "plasma-manager"
       }
     },
@@ -471,11 +473,11 @@
     "u-boot-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1787446235,
-        "narHash": "sha256-GPPQTTfnyKbtRQjSb34SpvBdaqV82XXM8IhLxMJodws=",
+        "lastModified": 1787502608,
+        "narHash": "sha256-Y1TQnXczQivmn05qCRvHygjinBy/I553u//aJCHb7Gc=",
         "owner": "SushyDev",
         "repo": "u-boot",
-        "rev": "2fa422313f6ab5bd9706d5c339f22ec31434a55e",
+        "rev": "7025b792e2884c5fb4747d891e30002ea029048a",
         "type": "github"
       },
       "original": {
