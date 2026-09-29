@@ -10,6 +10,8 @@
 
   users.users.sushy = {
     isNormalUser = true;
+    # Headless box: user units must run without an active login session
+    linger = true;
     extraGroups = [
       "wheel"
       "docker"

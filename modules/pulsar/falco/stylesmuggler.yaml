@@ -91,6 +91,14 @@
   tags: [stylesmuggler, c2]
 
 # time.cloudflare.com. WARP syncs against these legitimately.
+#
+# The exception used to also require container.image.repository = caomingjun/warp
+# and stopped matching on 2026-09-23: Falco reported container.id=host and an
+# empty image for warp-svc's tokio worker threads, even though the process sits
+# in a normal docker cgroup. The threads predate the running Falco, so it never
+# saw the clone that would have resolved the cgroup. Keyed on the destination
+# alone now -- these two addresses are Cloudflare's anycast NTP service and
+# cannot host a C2, and beaconing to any other NTP-speaking host still alerts.
 - list: cloudflare_ntp_servers
   items: ["162.159.200.1", "162.159.200.123"]
 
@@ -103,8 +111,7 @@
     and fd.l4proto = udp
     and fd.sport = 123
     and not proc.name in (systemd-timesyn, chronyd, ntpd, sntp)
-    and not (container.image.repository = "caomingjun/warp"
-             and fd.sip in (cloudflare_ntp_servers))
+    and not fd.sip in (cloudflare_ntp_servers)
   output: >
     Unexpected NTP traffic from a non-timekeeping process (dest=%fd.sip:%fd.sport
     proc=%proc.name cmd=%proc.cmdline user=%user.name container=%container.name
