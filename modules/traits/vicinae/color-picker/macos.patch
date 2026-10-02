@@ -1,0 +1,82 @@
+diff --git a/src/pick-color.tsx b/src/pick-color.tsx
+index cf955ac..984e1e4 100644
+--- a/src/pick-color.tsx
++++ b/src/pick-color.tsx
+@@ -49,6 +49,8 @@ async function detectImageMagickCommand(): Promise<string> {
+ }
+ 
+ async function checkDependencies(): Promise<{ missing: string[] }> {
++	if (process.platform === "darwin") return { missing: [] };
++
+ 	const deps = ["grim", "slurp"];
+ 	const missing: string[] = [];
+ 
+@@ -69,6 +71,29 @@ async function checkDependencies(): Promise<{ missing: string[] }> {
+ 	return { missing };
+ }
+ 
++async function pickWithGrim(): Promise<[string, string, string]> {
++	const magickCmd = await detectImageMagickCommand();
++	const tempFile = join(tmpdir(), `color-pick-${Date.now()}.png`);
++
++	const { stdout: coords } = await execAsync("slurp -p -f '%x,%y'");
++	const [x, y] = coords.trim().split(",");
++
++	await execAsync(`grim -g "${x},${y} 1x1" "${tempFile}"`);
++
++	const { stdout: colorOutput } = await execAsync(
++		`${magickCmd} "${tempFile}" -format "%[pixel:p{0,0}]" info:`
++	);
++	await unlink(tempFile);
++
++	const rgbMatch = colorOutput.match(/rgb\((\d+),(\d+),(\d+)\)/);
++	if (!rgbMatch) {
++		throw new Error("Failed to extract color from image");
++	}
++
++	const [, r, g, b] = rgbMatch;
++	return [r, g, b];
++}
++
+ export default function PickColor() {
+ 	const [colors, setColors] = useState<ColorEntry[]>([]);
+ 	const [isLoading, setIsLoading] = useState(true);
+@@ -132,24 +157,13 @@ export default function PickColor() {
+ 				throw new Error(`Missing dependencies: ${missing.join(", ")}`);
+ 			}
+ 
+-			const magickCmd = await detectImageMagickCommand();
+-			const tempFile = join(tmpdir(), `color-pick-${Date.now()}.png`);
+-			
+-			const { stdout: coords } = await execAsync("slurp -p -f '%x,%y'");
+-			const [x, y] = coords.trim().split(",");
+-			
+-			await execAsync(`grim -g "${x},${y} 1x1" "${tempFile}"`);
+-			
+-			const { stdout: colorOutput } = await execAsync(
+-				`${magickCmd} "${tempFile}" -format "%[pixel:p{0,0}]" info:`
+-			);
+-
+-			const rgbMatch = colorOutput.match(/rgb\((\d+),(\d+),(\d+)\)/);
+-			if (!rgbMatch) {
+-				throw new Error("Failed to extract color from image");
++			let r: string, g: string, b: string;
++			if (process.platform === "darwin") {
++				const { stdout } = await execAsync("@colorSampler@");
++				[r, g, b] = stdout.trim().split(",");
++			} else {
++				[r, g, b] = await pickWithGrim();
+ 			}
+-
+-			const [, r, g, b] = rgbMatch;
+ 			const hex = `#${Number.parseInt(r).toString(16).padStart(2, "0")}${Number.parseInt(g).toString(16).padStart(2, "0")}${Number.parseInt(b).toString(16).padStart(2, "0")}`.toUpperCase();
+ 			const rgb = `rgb(${r}, ${g}, ${b})`;
+ 
+@@ -170,7 +184,6 @@ export default function PickColor() {
+ 			toast.title = "Color picked!";
+ 			toast.message = `${hex} copied to clipboard`;
+ 
+-			await unlink(tempFile);
+ 		} catch (error) {
+ 			toast.style = Toast.Style.Failure;
+ 			toast.title = "Failed to pick color";

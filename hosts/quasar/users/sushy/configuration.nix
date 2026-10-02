@@ -20,6 +20,7 @@ in
     useDotfiles
     useNpm
     useSsh
+    useVicinae
   ]);
 
   home.packages = [

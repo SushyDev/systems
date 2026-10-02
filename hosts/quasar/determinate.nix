@@ -1,8 +1,5 @@
-{ ... }:
 {
   determinateNix = {
-    enable = true;
-
     customSettings = {
       experimental-features = [ "external-builders" ];
       lazy-trees = true;

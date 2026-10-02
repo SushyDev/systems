@@ -10,7 +10,6 @@ let
 in
 {
   imports = [
-    inputs.determinate.nixosModules.default
     inputs.disko.nixosModules.disko
     ./disko/btrfs-raid1.nix
     ./home-manager.nix
@@ -24,6 +23,7 @@ in
   ]
   ++ (with traits; [
     (useGroupOwnedFlake { gid = 502; })
+    useDeterminateNix
     useDirenv
     useHomeManager
     useNixSettings

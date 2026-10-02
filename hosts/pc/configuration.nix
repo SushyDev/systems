@@ -10,7 +10,6 @@ let
 in
 {
   imports = [
-    inputs.determinate.nixosModules.default
     ./home-manager.nix
     ./packages.nix
     ./programs.nix
@@ -24,6 +23,7 @@ in
   ]
   ++ (with traits; [
     (useGroupOwnedFlake { gid = 101; })
+    useDeterminateNix
     useHomeManager
     useNixSettings
     use1Password

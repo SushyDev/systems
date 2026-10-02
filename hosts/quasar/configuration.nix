@@ -9,7 +9,6 @@ let
 in
 {
   imports = [
-    inputs.determinate.darwinModules.default
     inputs.nix-plist-manager.darwinModules.default
     ./darwin.nix
     ./determinate.nix
@@ -21,6 +20,7 @@ in
       gid = 502;
       path = "/private/etc/nixdarwin";
     })
+    useDeterminateNix
     useHomeManager
     useNixSettings
     use1Password
@@ -37,7 +37,6 @@ in
     apps = inputs.nix-darwin-apps.packages.aarch64-darwin;
   in [
     pkgs.openssh
-    pkgs.raycast
     #pkgs.obsidian
     pkgs.opencode
     pkgs.aerospace
@@ -48,6 +47,11 @@ in
     pkgs.dbeaver-bin
     pkgs.ghostty-bin
     pkgs.orbstack
+
+    # Elixir / Phoenix (phx_new itself is a mix archive, installed per user)
+    pkgs.beam.packages.erlang_28.erlang
+    pkgs.beam.packages.erlang_28.elixir_1_20
+    pkgs.beam.packages.erlang_28.rebar3
 
     # My own overlay
     apps.vivaldi

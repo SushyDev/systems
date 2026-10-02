@@ -301,11 +301,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790283696,
-        "narHash": "sha256-c8J9LK40Mn+6UaS7sJZKSW28L2XkSivSF9dYl6bOeEc=",
+        "lastModified": 1790802830,
+        "narHash": "sha256-Fy48l/RWmjXLiMoJ4iIv4u5AvDVZO2JjE6ovorprzKs=",
         "owner": "sushydev",
         "repo": "nix-plist-manager",
-        "rev": "f3ac4aaa9504e2f27da6314a47acea69a2e778e4",
+        "rev": "4ef635b8b2f4c88929ea7d1a8a941acbab5de719",
         "type": "github"
       },
       "original": {

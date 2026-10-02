@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>TrailingItemPreferredPositions</key>
+	<dict>
+		<key>module:AudioVideoModule</key>
+		<real>267.0</real>
+		<key>module:Battery</key>
+		<real>143.5</real>
+		<key>module:BentoBox-0</key>
+		<real>117.5</real>
+		<key>module:Clock</key>
+		<real>0.0</real>
+		<key>module:NowPlaying</key>
+		<real>282.5</real>
+		<key>module:UserSwitcher</key>
+		<real>207.5</real>
+		<key>status:Notion::Item-0</key>
+		<real>165.0</real>
+		<key>status:com.1password.1password::bb3cc23c-6950-4e96-8b40-850e09f46934</key>
+		<real>203.5</real>
+		<key>status:com.creative.asdp.app::Item-0</key>
+		<real>169.5</real>
+		<key>status:dev.kdrag0n.MacVirt::Item-0</key>
+		<real>244.5</real>
+	</dict>
+</dict>
+</plist>

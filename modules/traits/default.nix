@@ -5,6 +5,7 @@ in
 mkTraits {
   use1Password = ./1password;
   useDdev = ./ddev;
+  useDeterminateNix = ./determinate;
   useDirenv = ./direnv;
   useDotfiles = ./dotfiles;
   useGroupOwnedFlake = ./group-owned-flake;
@@ -15,4 +16,5 @@ mkTraits {
   useOxidation = ./oxidation;
   usePasswordlessSudo = ./passwordless-sudo;
   useSsh = ./ssh;
+  useVicinae = ./vicinae;
 }
