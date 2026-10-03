@@ -1,0 +1,1443 @@
+From 43d23b06382eba7e51269a18e43bd9712346588e Mon Sep 17 00:00:00 2001
+From: Your Name <gamefroggy16@gmail.com>
+Date: Sat, 3 Oct 2026 21:40:28 +0000
+Subject: [PATCH 1/2] sd-boot: mirror the menu across every display
+
+sd-boot renders only through ST->ConOut, the firmware ConSplitter, which forces
+one shared text mode on every console and reaches whichever displays the
+firmware happened to wire up. GOP is consulted only to query a resolution, via
+LocateProtocol, which returns the first handle.
+
+Drive the displays directly instead. gop.c enumerates every GOP handle and puts
+each into its EDID preferred mode (falling back to whatever POST chose -- not
+the largest, since firmware maximums are often far above the panel). textfb.c
+implements EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL over an embedded 8x16 bitmap font,
+upscaled per display so a 1080p TV and a 1440p monitor read alike, and installs
+itself as ST->ConOut. Taking the protocol over rather than abstracting the call
+sites means util.c, efi-string.c and efi-log.c keep working untouched, and the
+menu mirrors to every display at its own native resolution.
+
+The character grid is shared and sized to the smallest display, which is what
+makes this a mirror. ST->ConOut is handed back before chainloading, since the
+protocol lives in sd-boot own memory.
+
+console_key_read() already waits on a timer, so it now also ticks once a second
+to re-assert modes and adopt displays that show up late; a monitor asleep at
+POST can be woken this way. multigop-reconnect additionally forces a controller
+re-probe, which is disruptive and therefore off by default.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+---
+ src/boot/boot.c              |  55 +++-
+ src/boot/console.c           |  30 +-
+ src/boot/console.h           |   4 +
+ src/boot/font-spleen.h       | 117 +++++++
+ src/boot/gop.c               | 279 ++++++++++++++++
+ src/boot/gop.h               |  33 ++
+ src/boot/meson.build         |   2 +
+ src/boot/proto/edid-active.h |  14 +
+ src/boot/textfb.c            | 608 +++++++++++++++++++++++++++++++++++
+ src/boot/textfb.h            |  36 +++
+ src/fundamental/edid.c       |  25 ++
+ src/fundamental/edid.h       |   2 +
+ 12 files changed, 1200 insertions(+), 5 deletions(-)
+ create mode 100644 src/boot/font-spleen.h
+ create mode 100644 src/boot/gop.c
+ create mode 100644 src/boot/gop.h
+ create mode 100644 src/boot/proto/edid-active.h
+ create mode 100644 src/boot/textfb.c
+ create mode 100644 src/boot/textfb.h
+
+diff --git a/src/boot/boot.c b/src/boot/boot.c
+index 2281246f9b..9e89c0838e 100644
+--- a/src/boot/boot.c
++++ b/src/boot/boot.c
+@@ -29,6 +29,7 @@
+ #include "sbat.h"
+ #include "secure-boot.h"
+ #include "shim.h"
++#include "textfb.h"
+ #include "smbios.h"
+ #include "strv.h"
+ #include "sysfail.h"
+@@ -168,6 +169,8 @@ typedef struct {
+         bool use_saved_entry_preferred;
+         bool use_saved_entry_preferred_efivar;
+         bool beep;
++        bool multigop;
++        bool multigop_reconnect;
+         bool sysfail_occurred;
+         int64_t console_mode;
+         int64_t console_mode_efivar;
+@@ -340,6 +343,28 @@ static void print_status(Config *config, char16_t *loaded_image_path) {
+                        screen_width, screen_height);
+         printf(")\n");
+ 
++        /* The only way to tell on real hardware which displays we actually found. */
++        if (textfb_active()) {
++                printf("      mirrored displays: %zu\n", textfb_n_displays());
++
++                for (size_t i = 0; i < textfb_n_displays(); i++) {
++                        uint32_t w, h, nw, nh, scale;
++
++                        if (!textfb_describe(i, &w, &h, &nw, &nh, &scale))
++                                continue;
++
++                        printf("            display %zu: %ux%u, font %ux%u", i, w, h,
++                               8 * scale, 16 * scale);
++                        if (nw > 0 && nh > 0)
++                                printf(", EDID native %ux%u%ls", nw, nh,
++                                       w == nw && h == nh ? u"" : u" (NOT in use)");
++                        else
++                                printf(", no EDID");
++                        printf("\n");
++                }
++        } else
++                printf("      mirrored displays: inactive (firmware console)\n");
++
+         if (!ps_continue())
+                 return;
+ 
+@@ -367,6 +392,8 @@ static void print_status(Config *config, char16_t *loaded_image_path) {
+         printf("                 auto-poweroff: %ls\n", yes_no(config->auto_poweroff));
+         printf("                   auto-reboot: %ls\n", yes_no(config->auto_reboot));
+         printf("                          beep: %ls\n", yes_no(config->beep));
++        printf("                      multigop: %ls\n", yes_no(config->multigop));
++        printf("            multigop-reconnect: %ls\n", yes_no(config->multigop_reconnect));
+         printf("          reboot-for-bitlocker: %ls\n", yes_no(config->reboot_for_bitlocker));
+         printf("               reboot-on-error: %s\n",  reboot_on_error_to_string(config->reboot_on_error));
+         printf("            secure-boot-enroll: %s\n",  secure_boot_enroll_to_string(config->secure_boot_enroll));
+@@ -537,9 +564,16 @@ static bool menu_run(
+         }
+ 
+         size_t line_width = 0, entry_padding = 3;
++        uint64_t textfb_gen = textfb_generation();
+         while (IN_SET(action, ACTION_CONTINUE, ACTION_FIRMWARE_SETUP)) {
+                 uint64_t key;
+ 
++                /* Adopting a display mid-menu can shrink the shared grid, so re-derive the layout. */
++                if (textfb_generation() != textfb_gen) {
++                        textfb_gen = textfb_generation();
++                        new_mode = true;
++                }
++
+                 if (new_mode) {
+                         console_query_mode(&x_max, &y_max);
+ 
+@@ -1162,6 +1196,14 @@ static void config_defaults_load_from_file(Config *config, char *content) {
+                         if (!parse_boolean(value, &config->beep))
+                                 log_warning("Error parsing 'beep' config option, ignoring: %s", value);
+ 
++                } else if (streq8(key, "multigop")) {
++                        if (!parse_boolean(value, &config->multigop))
++                                log_warning("Error parsing 'multigop' config option, ignoring: %s", value);
++
++                } else if (streq8(key, "multigop-reconnect")) {
++                        if (!parse_boolean(value, &config->multigop_reconnect))
++                                log_warning("Error parsing 'multigop-reconnect' config option, ignoring: %s", value);
++
+                 } else if (streq8(key, "reboot-for-bitlocker")) {
+                         if (!parse_boolean(value, &config->reboot_for_bitlocker))
+                                 log_warning("Error parsing 'reboot-for-bitlocker' config option, ignoring: %s",
+@@ -1600,6 +1642,7 @@ static void config_load_defaults(Config *config, EFI_FILE *root_dir) {
+ 
+         *config = (Config) {
+                 .editor = true,
++                .multigop = true,
+                 .auto_entries = true,
+                 .auto_firmware = true,
+                 .reboot_on_error = REBOOT_AUTO,
+@@ -3490,9 +3533,16 @@ static EFI_STATUS run(EFI_HANDLE image) {
+ 
+                 entry = config.entries[config.idx_default];
+                 if (menu) {
++                        /* Only take the displays over once we know we are showing a menu, so the
++                         * straight-to-boot path never touches display modes. */
++                        if (config.multigop && textfb_init())
++                                console_set_display_reconnect(config.multigop_reconnect);
++
+                         efivar_set_time_usec(MAKE_GUID_PTR(LOADER), u"LoaderTimeMenuUSec", 0);
+-                        if (!menu_run(&config, &entry, loaded_image_path))
++                        if (!menu_run(&config, &entry, loaded_image_path)) {
++                                textfb_restore();
+                                 return EFI_SUCCESS;
++                        }
+                 }
+ 
+                 (void) boot_entry_bump_counters(entry);
+@@ -3502,6 +3552,9 @@ static EFI_STATUS run(EFI_HANDLE image) {
+                 if (LOADER_TYPE_PROCESS_RANDOM_SEED(entry->type))
+                         (void) process_random_seed(root_dir);
+ 
++                /* Our protocol lives in sd-boot's memory, so the next image must get the real one. */
++                textfb_restore();
++
+                 err = ASSERT_PTR(entry->call)(entry, root_dir, image);
+                 if (err != EFI_SUCCESS) {
+                         if (config.reboot_on_error == REBOOT_YES || (config.reboot_on_error == REBOOT_AUTO && entry->tries_left > 0)) {
+diff --git a/src/boot/console.c b/src/boot/console.c
+index 06070347e3..95a30d5fe4 100644
+--- a/src/boot/console.c
++++ b/src/boot/console.c
+@@ -7,6 +7,7 @@
+ #include "proto/graphics-output.h"
+ #include "proto/pci-io.h"
+ #include "string-util.h"
++#include "textfb.h"
+ #include "util.h"
+ 
+ #define SYSTEM_FONT_WIDTH 8
+@@ -15,6 +16,18 @@
+ #define VERTICAL_MAX_OK 1080
+ #define VIEWPORT_RATIO 10
+ 
++/* How often to look for displays that appeared after we started. */
++#define DISPLAY_POLL_USEC UINT64_C(1000000)
++/* Forcing a controller re-probe is disruptive, so do it on only every Nth poll. */
++#define DISPLAY_RECONNECT_EVERY 5
++
++static bool display_reconnect_enabled = false;
++static uint64_t poll_count = 0;
++
++void console_set_display_reconnect(bool enable) {
++        display_reconnect_enabled = enable;
++}
++
+ static void event_closep(EFI_EVENT *event) {
+         assert(event);
+ 
+@@ -89,11 +102,16 @@ EFI_STATUS console_key_read(uint64_t *ret_key, uint64_t timeout_usec) {
+                 uint64_t watchdog_timeout_sec = 5 * 60,
+                        watchdog_ping_usec = watchdog_timeout_sec / 2 * 1000 * 1000;
+ 
++                /* While we own the console, wake up every second so a display that was asleep when
++                 * sd-boot started still gets picked up without the user having to press anything. */
++                uint64_t tick_usec = textfb_active() ?
++                                MIN(watchdog_ping_usec, DISPLAY_POLL_USEC) : watchdog_ping_usec;
++
+                 /* SetTimer expects 100ns units for some reason. */
+                 err = BS->SetTimer(
+                                 timer,
+                                 TimerRelative,
+-                                MIN(timeout_usec, watchdog_ping_usec) * 10);
++                                MIN(timeout_usec, tick_usec) * 10);
+                 if (err != EFI_SUCCESS)
+                         return log_error_status(err, "Error arming timer event: %m");
+ 
+@@ -108,11 +126,15 @@ EFI_STATUS console_key_read(uint64_t *ret_key, uint64_t timeout_usec) {
+                 if (timer != events[index])
+                         break;
+ 
+-                /* The EFI timer fired instead. If this was a watchdog timeout, loop again. */
++                /* The EFI timer fired instead. */
++                if (textfb_active())
++                        (void) textfb_poll(display_reconnect_enabled && ++poll_count % DISPLAY_RECONNECT_EVERY == 0);
++
++                /* If this was just a watchdog or display-poll tick, loop again. */
+                 if (timeout_usec == UINT64_MAX)
+                         continue;
+-                else if (timeout_usec > watchdog_ping_usec) {
+-                        timeout_usec -= watchdog_ping_usec;
++                else if (timeout_usec > tick_usec) {
++                        timeout_usec -= tick_usec;
+                         continue;
+                 }
+ 
+diff --git a/src/boot/console.h b/src/boot/console.h
+index 3a2bc6391c..dd9fa7747d 100644
+--- a/src/boot/console.h
++++ b/src/boot/console.h
+@@ -37,3 +37,7 @@ EFI_STATUS console_set_mode(int64_t mode);
+ EFI_STATUS console_query_mode(size_t *x_max, size_t *y_max);
+ EFI_STATUS query_screen_resolution(uint32_t *ret_width, uint32_t *ret_height);
+ void cmdline_append_console(char16_t **cmdline);
++
++/* Opt in to forcing a display-controller re-probe during key waits (loader.conf
++ * multigop-reconnect). Disruptive, so off unless asked for. */
++void console_set_display_reconnect(bool enable);
+diff --git a/src/boot/font-spleen.h b/src/boot/font-spleen.h
+new file mode 100644
+index 0000000000..939e864d5c
+--- /dev/null
++++ b/src/boot/font-spleen.h
+@@ -0,0 +1,117 @@
++/* SPDX-License-Identifier: BSD-2-Clause */
++/* Generated by gen-font.py -- do not edit.
++ * Source: spleen-8x16.bdf (Spleen, Copyright (c) 2018-2026, Frederic Cambus)
++ */
++#pragma once
++
++#include "efi.h"
++
++#define FONT_WIDTH 8
++#define FONT_HEIGHT 16
++#define FONT_FIRST_CHAR 0x20
++#define FONT_LAST_CHAR 0x7E
++
++/* ASCII 0x20..0x7E, one byte per scanline, MSB = leftmost pixel. */
++static const uint8_t font8x16[95][16] = {
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* ' ' */
++        { 0x00, 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00 }, /* '!' */
++        { 0x00, 0x66, 0x66, 0x66, 0x66, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* '"' */
++        { 0x00, 0x00, 0x6c, 0x6c, 0xfe, 0x6c, 0x6c, 0x6c, 0x6c, 0xfe, 0x6c, 0x6c, 0x00, 0x00, 0x00, 0x00 }, /* '#' */
++        { 0x00, 0x10, 0x7e, 0xd0, 0xd0, 0xd0, 0x7c, 0x16, 0x16, 0x16, 0x16, 0xfc, 0x10, 0x00, 0x00, 0x00 }, /* '$' */
++        { 0x00, 0x00, 0x06, 0x66, 0x6c, 0x0c, 0x18, 0x18, 0x30, 0x36, 0x66, 0x60, 0x00, 0x00, 0x00, 0x00 }, /* '%' */
++        { 0x00, 0x00, 0x38, 0x6c, 0x6c, 0x6c, 0x38, 0x70, 0xda, 0xcc, 0xcc, 0x7a, 0x00, 0x00, 0x00, 0x00 }, /* '&' */
++        { 0x00, 0x18, 0x18, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* "'" */
++        { 0x00, 0x0e, 0x18, 0x30, 0x30, 0x60, 0x60, 0x60, 0x60, 0x30, 0x30, 0x18, 0x0e, 0x00, 0x00, 0x00 }, /* '(' */
++        { 0x00, 0x70, 0x18, 0x0c, 0x0c, 0x06, 0x06, 0x06, 0x06, 0x0c, 0x0c, 0x18, 0x70, 0x00, 0x00, 0x00 }, /* ')' */
++        { 0x00, 0x00, 0x00, 0x00, 0x66, 0x3c, 0x18, 0xff, 0x18, 0x3c, 0x66, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* '*' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x7e, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* '+' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x30, 0x00, 0x00, 0x00 }, /* ',' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* '-' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00 }, /* '.' */
++        { 0x00, 0x06, 0x06, 0x0c, 0x0c, 0x18, 0x18, 0x30, 0x30, 0x60, 0x60, 0xc0, 0xc0, 0x00, 0x00, 0x00 }, /* '/' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0xc6, 0xce, 0xde, 0xf6, 0xe6, 0xc6, 0xc6, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* '0' */
++        { 0x00, 0x00, 0x18, 0x38, 0x78, 0x58, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* '1' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0x06, 0x06, 0x0c, 0x18, 0x30, 0x60, 0xc6, 0xfe, 0x00, 0x00, 0x00, 0x00 }, /* '2' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0x06, 0x06, 0x3c, 0x06, 0x06, 0x06, 0xc6, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* '3' */
++        { 0x00, 0x00, 0xc0, 0xc0, 0xcc, 0xcc, 0xcc, 0xcc, 0xfe, 0x0c, 0x0c, 0x0c, 0x00, 0x00, 0x00, 0x00 }, /* '4' */
++        { 0x00, 0x00, 0xfe, 0xc6, 0xc0, 0xc0, 0xfc, 0x06, 0x06, 0x06, 0xc6, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* '5' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0xc0, 0xc0, 0xfc, 0xc6, 0xc6, 0xc6, 0xc6, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* '6' */
++        { 0x00, 0x00, 0xfe, 0xc6, 0x06, 0x06, 0x0c, 0x18, 0x30, 0x30, 0x30, 0x30, 0x00, 0x00, 0x00, 0x00 }, /* '7' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0xc6, 0xc6, 0x7c, 0xc6, 0xc6, 0xc6, 0xc6, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* '8' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0xc6, 0xc6, 0xc6, 0x7e, 0x06, 0x06, 0xc6, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* '9' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00 }, /* ':' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x18, 0x18, 0x30, 0x00, 0x00, 0x00 }, /* ';' */
++        { 0x00, 0x00, 0x06, 0x0c, 0x18, 0x30, 0x60, 0x60, 0x30, 0x18, 0x0c, 0x06, 0x00, 0x00, 0x00, 0x00 }, /* '<' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x00, 0x7e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* '=' */
++        { 0x00, 0x00, 0x60, 0x30, 0x18, 0x0c, 0x06, 0x06, 0x0c, 0x18, 0x30, 0x60, 0x00, 0x00, 0x00, 0x00 }, /* '>' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0x06, 0x0c, 0x18, 0x30, 0x30, 0x00, 0x30, 0x30, 0x00, 0x00, 0x00, 0x00 }, /* '?' */
++        { 0x00, 0x00, 0x00, 0x7c, 0xc2, 0xda, 0xda, 0xda, 0xda, 0xde, 0xc0, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* '@' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0xc6, 0xc6, 0xfe, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'A' */
++        { 0x00, 0x00, 0xfc, 0xc6, 0xc6, 0xc6, 0xfc, 0xc6, 0xc6, 0xc6, 0xc6, 0xfc, 0x00, 0x00, 0x00, 0x00 }, /* 'B' */
++        { 0x00, 0x00, 0x7e, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'C' */
++        { 0x00, 0x00, 0xfc, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xfc, 0x00, 0x00, 0x00, 0x00 }, /* 'D' */
++        { 0x00, 0x00, 0x7e, 0xc0, 0xc0, 0xc0, 0xf8, 0xc0, 0xc0, 0xc0, 0xc0, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'E' */
++        { 0x00, 0x00, 0x7e, 0xc0, 0xc0, 0xc0, 0xf8, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0x00, 0x00, 0x00, 0x00 }, /* 'F' */
++        { 0x00, 0x00, 0x7e, 0xc0, 0xc0, 0xc0, 0xde, 0xc6, 0xc6, 0xc6, 0xc6, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'G' */
++        { 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0xfe, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'H' */
++        { 0x00, 0x00, 0x7e, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'I' */
++        { 0x00, 0x00, 0x7e, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0xf0, 0x00, 0x00, 0x00, 0x00 }, /* 'J' */
++        { 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xcc, 0xf8, 0xcc, 0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'K' */
++        { 0x00, 0x00, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'L' */
++        { 0x00, 0x00, 0xc6, 0xee, 0xfe, 0xd6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'M' */
++        { 0x00, 0x00, 0xc6, 0xc6, 0xe6, 0xe6, 0xd6, 0xd6, 0xce, 0xce, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'N' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* 'O' */
++        { 0x00, 0x00, 0xfc, 0xc6, 0xc6, 0xc6, 0xfc, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0x00, 0x00, 0x00, 0x00 }, /* 'P' */
++        { 0x00, 0x00, 0x7c, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xd6, 0xd6, 0x7c, 0x18, 0x0c, 0x00, 0x00 }, /* 'Q' */
++        { 0x00, 0x00, 0xfc, 0xc6, 0xc6, 0xc6, 0xfc, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'R' */
++        { 0x00, 0x00, 0x7e, 0xc0, 0xc0, 0xc0, 0x7c, 0x06, 0x06, 0x06, 0x06, 0xfc, 0x00, 0x00, 0x00, 0x00 }, /* 'S' */
++        { 0x00, 0x00, 0xff, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00 }, /* 'T' */
++        { 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'U' */
++        { 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x6c, 0x38, 0x10, 0x00, 0x00, 0x00, 0x00 }, /* 'V' */
++        { 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xd6, 0xfe, 0xee, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'W' */
++        { 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0x6c, 0x38, 0x6c, 0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'X' */
++        { 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0x7e, 0x06, 0x06, 0x06, 0x06, 0xfc, 0x00, 0x00, 0x00, 0x00 }, /* 'Y' */
++        { 0x00, 0x00, 0xfe, 0x06, 0x06, 0x0c, 0x18, 0x30, 0x60, 0xc0, 0xc0, 0xfe, 0x00, 0x00, 0x00, 0x00 }, /* 'Z' */
++        { 0x00, 0x3e, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x3e, 0x00, 0x00, 0x00 }, /* '[' */
++        { 0x00, 0xc0, 0xc0, 0x60, 0x60, 0x30, 0x30, 0x18, 0x18, 0x0c, 0x0c, 0x06, 0x06, 0x00, 0x00, 0x00 }, /* '\\\\' */
++        { 0x00, 0x7c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x7c, 0x00, 0x00, 0x00 }, /* ']' */
++        { 0x00, 0x10, 0x38, 0x6c, 0xc6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* '^' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0x00 }, /* '_' */
++        { 0x00, 0x30, 0x18, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* '`' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7c, 0x06, 0x7e, 0xc6, 0xc6, 0xc6, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'a' */
++        { 0x00, 0x00, 0xc0, 0xc0, 0xc0, 0xfc, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xfc, 0x00, 0x00, 0x00, 0x00 }, /* 'b' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'c' */
++        { 0x00, 0x00, 0x06, 0x06, 0x06, 0x7e, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'd' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0xc6, 0xc6, 0xfe, 0xc0, 0xc0, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'e' */
++        { 0x00, 0x00, 0x1e, 0x30, 0x30, 0x30, 0x7c, 0x30, 0x30, 0x30, 0x30, 0x30, 0x00, 0x00, 0x00, 0x00 }, /* 'f' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x7c, 0x06, 0x06, 0xfc, 0x00 }, /* 'g' */
++        { 0x00, 0x00, 0xc0, 0xc0, 0xc0, 0xfc, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'h' */
++        { 0x00, 0x00, 0x18, 0x18, 0x00, 0x38, 0x18, 0x18, 0x18, 0x18, 0x18, 0x1c, 0x00, 0x00, 0x00, 0x00 }, /* 'i' */
++        { 0x00, 0x00, 0x18, 0x18, 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x70, 0x00 }, /* 'j' */
++        { 0x00, 0x00, 0xc0, 0xc0, 0xc0, 0xcc, 0xd8, 0xf0, 0xf0, 0xd8, 0xcc, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'k' */
++        { 0x00, 0x00, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x1c, 0x00, 0x00, 0x00, 0x00 }, /* 'l' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xec, 0xd6, 0xd6, 0xd6, 0xd6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'm' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'n' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7c, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x7c, 0x00, 0x00, 0x00, 0x00 }, /* 'o' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xfc, 0xc0, 0xc0, 0xc0, 0x00 }, /* 'p' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x7e, 0x06, 0x06, 0x06, 0x00 }, /* 'q' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0xc6, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0x00, 0x00, 0x00, 0x00 }, /* 'r' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e, 0xc0, 0xc0, 0x7c, 0x06, 0x06, 0xfc, 0x00, 0x00, 0x00, 0x00 }, /* 's' */
++        { 0x00, 0x00, 0x30, 0x30, 0x30, 0x7c, 0x30, 0x30, 0x30, 0x30, 0x30, 0x1e, 0x00, 0x00, 0x00, 0x00 }, /* 't' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x7e, 0x00, 0x00, 0x00, 0x00 }, /* 'u' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0x6c, 0x38, 0x10, 0x00, 0x00, 0x00, 0x00 }, /* 'v' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xc6, 0xc6, 0xd6, 0xd6, 0xd6, 0xd6, 0x6e, 0x00, 0x00, 0x00, 0x00 }, /* 'w' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xc6, 0x6c, 0x38, 0x38, 0x6c, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00 }, /* 'x' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0x7e, 0x06, 0x06, 0xfc, 0x00 }, /* 'y' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0x06, 0x0c, 0x18, 0x30, 0x60, 0xfe, 0x00, 0x00, 0x00, 0x00 }, /* 'z' */
++        { 0x00, 0x0e, 0x18, 0x18, 0x18, 0x18, 0x70, 0x70, 0x18, 0x18, 0x18, 0x18, 0x0e, 0x00, 0x00, 0x00 }, /* '{' */
++        { 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x00, 0x00 }, /* '|' */
++        { 0x00, 0x70, 0x18, 0x18, 0x18, 0x18, 0x0e, 0x0e, 0x18, 0x18, 0x18, 0x18, 0x70, 0x00, 0x00, 0x00 }, /* '}' */
++        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, 0x7e, 0x4c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* '~' */
++};
++
++/* Drawn for anything outside the table (e.g. box drawing, accented chars). */
++static const uint8_t font8x16_replacement[16] = {
++        0x00, 0x00, 0x7e, 0x42, 0x42, 0x42, 0x42, 0x42,
++        0x42, 0x42, 0x42, 0x42, 0x7e, 0x00, 0x00, 0x00,
++};
+diff --git a/src/boot/gop.c b/src/boot/gop.c
+new file mode 100644
+index 0000000000..bc460946f6
+--- /dev/null
++++ b/src/boot/gop.c
+@@ -0,0 +1,279 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++#include "edid.h"
++#include "efi-log.h"
++#include "gop.h"
++#include "proto/device-path.h"
++#include "proto/edid-active.h"
++#include "proto/edid-discovered.h"
++#include "proto/pci-io.h"
++#include "util.h"
++
++#define PCI_CLASS_DISPLAY 0x03
++
++/* EDID for one specific display, rather than console.c's global LocateProtocol lookup. */
++static bool try_edid(GopDisplay *d, EFI_GUID *guid, const char *name) {
++        /* Active and discovered EDID share this layout, so one struct covers both. */
++        EFI_EDID_ACTIVE_PROTOCOL *edid = NULL;
++
++        if (BS->HandleProtocol(d->handle, guid, (void **) &edid) != EFI_SUCCESS)
++                return false;
++        if (!edid || !edid->Edid || edid->SizeOfEdid == 0)
++                return false;
++
++        uint32_t w, h;
++        if (edid_get_preferred_mode(edid->Edid, edid->SizeOfEdid, &w, &h) < 0)
++                return false;
++
++        d->native_width = w;
++        d->native_height = h;
++        log_debug("Display %p: %s EDID reports native %ux%u.", d->handle, name, w, h);
++        return true;
++}
++
++/* Prefers the active EDID (post platform override), falling back to what the monitor reported. */
++static void read_native_resolution(GopDisplay *d) {
++        assert(d);
++
++        if (try_edid(d, MAKE_GUID_PTR(EFI_EDID_ACTIVE_PROTOCOL), "active"))
++                return;
++        if (try_edid(d, MAKE_GUID_PTR(EFI_EDID_DISCOVERED_PROTOCOL), "discovered"))
++                return;
++
++        log_debug("Display %p: no usable EDID, will fall back to the largest mode.", d->handle);
++}
++
++
++/* Native mode if EDID tells us one, otherwise whatever the firmware already chose. Deliberately
++ * per-display: this is what the stock ConOut path cannot do, because ConSplitter forces one mode on
++ * every console. We do not reach for the largest mode -- firmware maximums are often far above what
++ * the panel actually is (OVMF offers 2048x2048), and POST's own choice is known to work. */
++static EFI_STATUS select_best_mode(GopDisplay *d) {
++        assert(d);
++        assert(d->gop);
++
++        if (!d->gop->Mode || d->gop->Mode->MaxMode == 0)
++                return EFI_UNSUPPORTED;
++
++        uint32_t initial_mode = d->gop->Mode->Mode;
++        uint32_t initial_w = 0, initial_h = 0;
++        if (d->gop->Mode->Info) {
++                initial_w = d->gop->Mode->Info->HorizontalResolution;
++                initial_h = d->gop->Mode->Info->VerticalResolution;
++        }
++
++        uint32_t fallback_mode = initial_mode, fallback_w = initial_w, fallback_h = initial_h;
++        uint64_t largest_area = 0;
++        bool found_native = false;
++
++        for (uint32_t m = 0; m < d->gop->Mode->MaxMode; m++) {
++                EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info = NULL;
++                size_t info_size = 0;
++
++                if (d->gop->QueryMode(d->gop, m, &info_size, &info) != EFI_SUCCESS)
++                        continue;
++                if (!info || info_size < sizeof(*info)) {
++                        free(info);
++                        continue;
++                }
++
++                uint32_t w = info->HorizontalResolution, h = info->VerticalResolution;
++                free(info);
++
++                if (w == 0 || h == 0)
++                        continue;
++
++                if (d->native_width != 0 && w == d->native_width && h == d->native_height) {
++                        d->mode = m;
++                        d->width = w;
++                        d->height = h;
++                        found_native = true;
++                        break;
++                }
++
++                /* Only used if the firmware left us without a valid current mode. */
++                uint64_t area = (uint64_t) w * (uint64_t) h;
++                if (initial_w == 0 && area > largest_area) {
++                        largest_area = area;
++                        fallback_mode = m;
++                        fallback_w = w;
++                        fallback_h = h;
++                }
++        }
++
++        if (!found_native) {
++                if (fallback_w == 0 || fallback_h == 0)
++                        return EFI_NOT_FOUND;
++
++                d->mode = fallback_mode;
++                d->width = fallback_w;
++                d->height = fallback_h;
++        }
++
++        if (d->gop->Mode->Mode != d->mode) {
++                EFI_STATUS err = d->gop->SetMode(d->gop, d->mode);
++                if (err != EFI_SUCCESS)
++                        return log_debug_status(
++                                        err,
++                                        "Display %p: cannot set mode %u (%ux%u): %m",
++                                        d->handle, d->mode, d->width, d->height);
++        }
++
++        log_debug("Display %p: using mode %u (%ux%u)%s.",
++                  d->handle, d->mode, d->width, d->height,
++                  found_native ? ", EDID native" : ", firmware default");
++        return EFI_SUCCESS;
++}
++
++static bool display_init(GopDisplay *d, EFI_HANDLE handle) {
++        assert(d);
++
++        EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
++        if (BS->HandleProtocol(handle, MAKE_GUID_PTR(EFI_GRAPHICS_OUTPUT_PROTOCOL), (void **) &gop) != EFI_SUCCESS)
++                return false;
++        if (!gop || !gop->Mode)
++                return false;
++
++        *d = (GopDisplay) {
++                .handle = handle,
++                .gop = gop,
++        };
++
++        read_native_resolution(d);
++        return select_best_mode(d) == EFI_SUCCESS;
++}
++
++/* ConSplitter publishes an aggregate GOP on the console handle that fans out to the real ones.
++ * Rendering to it as well as to each device would paint everything twice and report a resolution
++ * belonging to no single display, so skip it -- unless it is all we have. */
++static bool handle_is_console_aggregate(EFI_HANDLE handle) {
++        if (handle == ST->ConsoleOutHandle)
++                return true;
++
++        /* The aggregate handle is virtual and so carries no device path, the same tell console.c
++         * already relies on for ConOut. */
++        EFI_DEVICE_PATH *dp = NULL;
++        return BS->HandleProtocol(handle, MAKE_GUID_PTR(EFI_DEVICE_PATH_PROTOCOL), (void **) &dp) != EFI_SUCCESS;
++}
++
++static size_t collect(GopDisplay **displays, size_t n_existing, bool skip_aggregate) {
++        _cleanup_free_ EFI_HANDLE *handles = NULL;
++        size_t n_handles = 0;
++
++        EFI_STATUS err = BS->LocateHandleBuffer(
++                        ByProtocol,
++                        MAKE_GUID_PTR(EFI_GRAPHICS_OUTPUT_PROTOCOL),
++                        NULL,
++                        &n_handles,
++                        &handles);
++        if (err != EFI_SUCCESS || n_handles == 0)
++                return 0;
++
++        size_t added = 0;
++
++        for (size_t i = 0; i < n_handles; i++) {
++                if (skip_aggregate && handle_is_console_aggregate(handles[i]))
++                        continue;
++
++                bool known = false;
++                for (size_t j = 0; j < n_existing + added; j++)
++                        if ((*displays)[j].handle == handles[i]) {
++                                known = true;
++                                break;
++                        }
++                if (known)
++                        continue;
++
++                GopDisplay candidate;
++                if (!display_init(&candidate, handles[i]))
++                        continue;
++
++                *displays = xrealloc(
++                                *displays,
++                                (n_existing + added) * sizeof(GopDisplay),
++                                (n_existing + added + 1) * sizeof(GopDisplay));
++                (*displays)[n_existing + added] = candidate;
++                added++;
++        }
++
++        return added;
++}
++
++size_t gop_enumerate(GopDisplay **ret_displays) {
++        assert(ret_displays);
++
++        *ret_displays = NULL;
++        size_t n = collect(ret_displays, 0, /* skip_aggregate= */ true);
++
++        /* No per-device GOP: a firmware that only offers the aggregate, or a VM. Use it anyway. */
++        if (n == 0)
++                n = collect(ret_displays, 0, /* skip_aggregate= */ false);
++
++        log_debug("Found %zu usable display(s).", n);
++        return n;
++}
++
++size_t gop_rescan(GopDisplay **displays, size_t n_displays) {
++        assert(displays);
++
++        return collect(displays, n_displays, /* skip_aggregate= */ true);
++}
++
++bool gop_reassert_mode(GopDisplay *d) {
++        assert(d);
++        assert(d->gop);
++
++        if (!d->gop->Mode)
++                return false;
++
++        /* A display that went away and came back can land in a different mode, or in none at all.
++         * Setting it again also retrains the link, which is what wakes a monitor out of standby. */
++        if (d->gop->Mode->Mode == d->mode)
++                return false;
++
++        if (d->gop->SetMode(d->gop, d->mode) != EFI_SUCCESS)
++                return false;
++
++        log_debug("Display %p: re-asserted mode %u.", d->handle, d->mode);
++        return true;
++}
++
++/* Last resort for a display that was off at POST and so never got a GOP handle: make the firmware
++ * re-run its graphics driver's Start(), which re-probes the connectors. This can also take the
++ * console down until reboot, hence the loader.conf opt-in. */
++EFI_STATUS gop_force_reconnect(void) {
++        _cleanup_free_ EFI_HANDLE *handles = NULL;
++        size_t n_handles = 0;
++
++        EFI_STATUS err = BS->LocateHandleBuffer(
++                        ByProtocol, MAKE_GUID_PTR(EFI_PCI_IO_PROTOCOL), NULL, &n_handles, &handles);
++        if (err != EFI_SUCCESS)
++                return err;
++
++        size_t n_reconnected = 0;
++
++        for (size_t i = 0; i < n_handles; i++) {
++                EFI_PCI_IO_PROTOCOL *pci_io = NULL;
++                if (BS->HandleProtocol(handles[i], MAKE_GUID_PTR(EFI_PCI_IO_PROTOCOL), (void **) &pci_io) != EFI_SUCCESS)
++                        continue;
++
++                /* Base class lives at offset 0x0b in PCI config space. */
++                uint8_t base_class = 0;
++                if (pci_io->Pci.Read(pci_io, EfiPciIoWidthUint8, 0x0b, 1, &base_class) != EFI_SUCCESS)
++                        continue;
++                if (base_class != PCI_CLASS_DISPLAY)
++                        continue;
++
++                (void) BS->DisconnectController(handles[i], NULL, NULL);
++                err = BS->ConnectController(handles[i], NULL, NULL, /* Recursive= */ true);
++                if (err != EFI_SUCCESS) {
++                        log_debug_status(err, "Failed to reconnect display controller %p: %m", handles[i]);
++                        continue;
++                }
++
++                n_reconnected++;
++        }
++
++        log_debug("Reconnected %zu display controller(s).", n_reconnected);
++        return n_reconnected > 0 ? EFI_SUCCESS : EFI_NOT_FOUND;
++}
+diff --git a/src/boot/gop.h b/src/boot/gop.h
+new file mode 100644
+index 0000000000..9c35b70814
+--- /dev/null
++++ b/src/boot/gop.h
+@@ -0,0 +1,33 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include "efi.h"
++#include "proto/graphics-output.h"
++
++/* One entry per display the firmware exposes a GOP for. The hardware half is owned by gop.c; the
++ * render half (font_scale and below) is written only by textfb.c. */
++typedef struct GopDisplay {
++        EFI_HANDLE handle;
++        EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
++
++        uint32_t width, height;      /* pixel size of the mode we selected */
++        uint32_t mode;               /* GOP mode number we selected */
++        uint32_t native_width;       /* EDID preferred timing, 0 if unknown */
++        uint32_t native_height;
++
++        uint32_t font_scale;         /* integer upscale factor for the 8x16 font */
++        uint32_t x_off, y_off;       /* top-left of the centred text area, in pixels */
++} GopDisplay;
++
++/* Discovers every usable GOP and puts each into its best mode. Returns the number found. */
++size_t gop_enumerate(GopDisplay **ret_displays);
++
++/* Re-scans for handles that appeared since gop_enumerate(). Appends any new ones (already
++ * mode-set) and returns how many were added. */
++size_t gop_rescan(GopDisplay **displays, size_t n_displays);
++
++/* Re-asserts the selected mode if the firmware reports the display fell out of it. True if a
++ * mode set actually happened, meaning the caller must repaint. */
++bool gop_reassert_mode(GopDisplay *d);
++
++EFI_STATUS gop_force_reconnect(void);
+diff --git a/src/boot/meson.build b/src/boot/meson.build
+index 6da1ae6e2f..fb65745152 100644
+--- a/src/boot/meson.build
++++ b/src/boot/meson.build
+@@ -322,6 +322,7 @@ libefi_sources = files(
+         'efi-log.c',
+         'efi-string.c',
+         'export-vars.c',
++        'gop.c',
+         'graphics.c',
+         'hii.c',
+         'initrd.c',
+@@ -334,6 +335,7 @@ libefi_sources = files(
+         'shim.c',
+         'smbios.c',
+         'sysfail.c',
++        'textfb.c',
+         'ticks.c',
+         'url-discovery.c',
+         'util.c',
+diff --git a/src/boot/proto/edid-active.h b/src/boot/proto/edid-active.h
+new file mode 100644
+index 0000000000..185f6ce884
+--- /dev/null
++++ b/src/boot/proto/edid-active.h
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include "efi.h"
++
++/* Same shape as EFI_EDID_DISCOVERED_PROTOCOL, but reflects the EDID actually in use after any
++ * platform override. Unlike the discovered one we look this up per GOP handle, not globally. */
++#define EFI_EDID_ACTIVE_PROTOCOL_GUID \
++        GUID_DEF(0xbd8c1056, 0x9f36, 0x44ec, 0x92, 0xa8, 0xa6, 0x33, 0x7f, 0x81, 0x79, 0x86)
++
++typedef struct {
++        uint32_t SizeOfEdid;
++        uint8_t *Edid;
++} EFI_EDID_ACTIVE_PROTOCOL;
+diff --git a/src/boot/textfb.c b/src/boot/textfb.c
+new file mode 100644
+index 0000000000..3438ee94be
+--- /dev/null
++++ b/src/boot/textfb.c
+@@ -0,0 +1,608 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++#include "efi-log.h"
++#include "font-spleen.h"
++#include "gop.h"
++#include "proto/simple-text-io.h"
++#include "textfb.h"
++#include "util.h"
++
++/* Aim for roughly this much text; the font is upscaled by whatever integer factor gets closest, so
++ * a 1080p TV and a 1440p monitor end up with similar apparent text size. */
++#define TARGET_COLS 100
++#define TARGET_ROWS 28
++
++#define FONT_SCALE_MAX 8
++
++/* Below this a grid is not worth driving, so leave the firmware console alone. */
++#define MIN_COLS 40
++#define MIN_ROWS 10
++
++typedef struct {
++        char16_t c;
++        uint8_t attr;
++} Cell;
++
++/* Mode 0 picks a scale per display; modes 1..FONT_SCALE_MAX force that scale everywhere, which is
++ * what the menu's existing console-mode key now cycles through. */
++#define N_MODES (FONT_SCALE_MAX + 1)
++
++typedef struct {
++        int32_t MaxMode;
++        int32_t Mode;
++        int32_t Attribute;
++        int32_t CursorColumn;
++        int32_t CursorRow;
++        bool CursorVisible;
++} TextFbMode;
++
++static GopDisplay *displays = NULL;
++static size_t n_displays = 0;
++
++static Cell *grid = NULL;
++static size_t n_cols = 0, n_rows = 0;
++
++static EFI_GRAPHICS_OUTPUT_BLT_PIXEL *cell_buf = NULL;
++static size_t cell_buf_n_px = 0;
++
++static EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *saved_conout = NULL;
++static bool initialized = false;
++static uint64_t generation = 0;
++static EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL textfb_proto;
++static TextFbMode textfb_mode;
++
++/* Standard CGA/EFI 16-colour palette. EFI_GRAPHICS_OUTPUT_BLT_PIXEL is BGRA. */
++static const EFI_GRAPHICS_OUTPUT_BLT_PIXEL palette[16] = {
++        { 0x00, 0x00, 0x00, 0x00 }, /* black */
++        { 0xaa, 0x00, 0x00, 0x00 }, /* blue */
++        { 0x00, 0xaa, 0x00, 0x00 }, /* green */
++        { 0xaa, 0xaa, 0x00, 0x00 }, /* cyan */
++        { 0x00, 0x00, 0xaa, 0x00 }, /* red */
++        { 0xaa, 0x00, 0xaa, 0x00 }, /* magenta */
++        { 0x00, 0x55, 0xaa, 0x00 }, /* brown */
++        { 0xaa, 0xaa, 0xaa, 0x00 }, /* light gray */
++        { 0x55, 0x55, 0x55, 0x00 }, /* dark gray */
++        { 0xff, 0x55, 0x55, 0x00 }, /* light blue */
++        { 0x55, 0xff, 0x55, 0x00 }, /* light green */
++        { 0xff, 0xff, 0x55, 0x00 }, /* light cyan */
++        { 0x55, 0x55, 0xff, 0x00 }, /* light red */
++        { 0xff, 0x55, 0xff, 0x00 }, /* light magenta */
++        { 0x55, 0xff, 0xff, 0x00 }, /* yellow */
++        { 0xff, 0xff, 0xff, 0x00 }, /* white */
++};
++
++static const uint8_t *glyph_for(char16_t c) {
++        if (c >= FONT_FIRST_CHAR && c <= FONT_LAST_CHAR)
++                return font8x16[c - FONT_FIRST_CHAR];
++
++        return font8x16_replacement;
++}
++
++static uint32_t auto_scale(const GopDisplay *d) {
++        assert(d);
++
++        uint32_t by_width = d->width / (FONT_WIDTH * TARGET_COLS);
++        uint32_t by_height = d->height / (FONT_HEIGHT * TARGET_ROWS);
++        uint32_t s = MIN(by_width, by_height);
++
++        return CLAMP(s, 1U, (uint32_t) FONT_SCALE_MAX);
++}
++
++static void ensure_cell_buf(void) {
++        size_t needed = 0;
++
++        FOREACH_ARRAY(d, displays, n_displays)
++                needed = MAX(needed,
++                             (size_t) (FONT_WIDTH * d->font_scale) * (size_t) (FONT_HEIGHT * d->font_scale));
++
++        if (needed <= cell_buf_n_px)
++                return;
++
++        cell_buf = xrealloc(cell_buf,
++                            cell_buf_n_px * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL),
++                            needed * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
++        cell_buf_n_px = needed;
++}
++
++/* The scale a display would use for a mode. A forced scale can be too big for a small display, so
++ * back off until the grid it yields is usable. */
++static uint32_t scale_for(const GopDisplay *d, int32_t mode) {
++        assert(d);
++
++        uint32_t scale = mode == 0 ? auto_scale(d) : (uint32_t) mode;
++
++        while (scale > 1 &&
++               (d->width / (FONT_WIDTH * scale) < MIN_COLS ||
++                d->height / (FONT_HEIGHT * scale) < MIN_ROWS))
++                scale--;
++
++        return scale;
++}
++
++/* Derives the shared grid for a mode, which has to be the smallest any single display can show.
++ * With apply set, also commits each display's font scale and centring offsets, and resizes the
++ * glyph buffer to match. Decides before committing, so a mode that turns out to be unusable cannot
++ * leave the displays claiming a scale the glyph buffer is not sized for. */
++static bool layout(int32_t mode, bool apply, size_t *ret_cols, size_t *ret_rows) {
++        assert(ret_cols);
++        assert(ret_rows);
++
++        if (n_displays == 0)
++                return false;
++
++        size_t cols = SIZE_MAX, rows = SIZE_MAX;
++
++        FOREACH_ARRAY(d, displays, n_displays) {
++                uint32_t scale = scale_for(d, mode);
++
++                cols = MIN(cols, (size_t) (d->width / (FONT_WIDTH * scale)));
++                rows = MIN(rows, (size_t) (d->height / (FONT_HEIGHT * scale)));
++        }
++
++        if (cols < MIN_COLS || rows < MIN_ROWS)
++                return false;
++
++        if (apply) {
++                FOREACH_ARRAY(d, displays, n_displays) {
++                        d->font_scale = scale_for(d, mode);
++                        d->x_off = (d->width - cols * FONT_WIDTH * d->font_scale) / 2;
++                        d->y_off = (d->height - rows * FONT_HEIGHT * d->font_scale) / 2;
++                }
++
++                ensure_cell_buf();
++        }
++
++        *ret_cols = cols;
++        *ret_rows = rows;
++        return true;
++}
++
++
++static void draw_cell(GopDisplay *d, size_t x, size_t y, Cell cell) {
++        assert(d);
++
++        if (x >= n_cols || y >= n_rows)
++                return;
++
++        uint32_t s = d->font_scale;
++        uint32_t cw = FONT_WIDTH * s, ch = FONT_HEIGHT * s;
++        EFI_GRAPHICS_OUTPUT_BLT_PIXEL fg = palette[cell.attr & 0x0f];
++        EFI_GRAPHICS_OUTPUT_BLT_PIXEL bg = palette[(cell.attr >> 4) & 0x0f];
++        const uint8_t *glyph = glyph_for(cell.c);
++
++        /* A blank cell is a plain fill, no buffer needed. */
++        if (cell.c == ' ') {
++                (void) d->gop->Blt(d->gop, &bg, EfiBltVideoFill, 0, 0,
++                                   d->x_off + x * cw, d->y_off + y * ch, cw, ch, 0);
++                return;
++        }
++
++        for (uint32_t gy = 0; gy < FONT_HEIGHT; gy++) {
++                uint8_t bits = glyph[gy];
++
++                for (uint32_t gx = 0; gx < FONT_WIDTH; gx++) {
++                        EFI_GRAPHICS_OUTPUT_BLT_PIXEL px = (bits & (0x80U >> gx)) ? fg : bg;
++
++                        /* Replicate each font pixel into an s x s block. */
++                        for (uint32_t sy = 0; sy < s; sy++) {
++                                EFI_GRAPHICS_OUTPUT_BLT_PIXEL *row =
++                                                cell_buf + (size_t) (gy * s + sy) * cw + gx * s;
++                                for (uint32_t sx = 0; sx < s; sx++)
++                                        row[sx] = px;
++                        }
++                }
++        }
++
++        (void) d->gop->Blt(d->gop, cell_buf, EfiBltBufferToVideo, 0, 0,
++                           d->x_off + x * cw, d->y_off + y * ch, cw, ch, 0);
++}
++
++static void fill_display(GopDisplay *d, uint8_t attr) {
++        assert(d);
++
++        EFI_GRAPHICS_OUTPUT_BLT_PIXEL bg = palette[(attr >> 4) & 0x0f];
++
++        /* Covers the centring margins too, so no stale pixels survive a mode change. */
++        (void) d->gop->Blt(d->gop, &bg, EfiBltVideoFill, 0, 0, 0, 0, d->width, d->height, 0);
++}
++
++static void paint_display(GopDisplay *d, uint8_t fill_attr) {
++        assert(d);
++
++        uint8_t fill_bg = (fill_attr >> 4) & 0x0f;
++
++        for (size_t y = 0; y < n_rows; y++)
++                for (size_t x = 0; x < n_cols; x++) {
++                        Cell cell = grid[y * n_cols + x];
++
++                        /* Blanks only come for free where the screen fill already laid down their
++                         * background -- a highlighted run's spaces still have to be drawn. */
++                        if (cell.c == ' ' && ((cell.attr >> 4) & 0x0f) == fill_bg)
++                                continue;
++
++                        draw_cell(d, x, y, cell);
++                }
++}
++
++static void repaint_all(void) {
++        FOREACH_ARRAY(d, displays, n_displays) {
++                fill_display(d, textfb_mode.Attribute);
++                paint_display(d, textfb_mode.Attribute);
++        }
++}
++
++static void write_cell(size_t x, size_t y, char16_t c, uint8_t attr) {
++        if (x >= n_cols || y >= n_rows)
++                return;
++
++        Cell cell = { .c = c, .attr = attr };
++        grid[y * n_cols + x] = cell;
++
++        FOREACH_ARRAY(d, displays, n_displays)
++                draw_cell(d, x, y, cell);
++}
++
++/* Shifts the text area up a row using the GOP's own video-to-video copy, which is one call per
++ * display rather than one per character cell. */
++static void scroll_up(void) {
++        uint8_t attr = textfb_mode.Attribute;
++
++        for (size_t y = 0; y + 1 < n_rows; y++)
++                memcpy(grid + y * n_cols, grid + (y + 1) * n_cols, n_cols * sizeof(Cell));
++        for (size_t x = 0; x < n_cols; x++) {
++                Cell blank = { .c = ' ', .attr = attr };
++                grid[(n_rows - 1) * n_cols + x] = blank;
++        }
++
++        FOREACH_ARRAY(d, displays, n_displays) {
++                uint32_t cw = FONT_WIDTH * d->font_scale, ch = FONT_HEIGHT * d->font_scale;
++                EFI_GRAPHICS_OUTPUT_BLT_PIXEL bg = palette[(attr >> 4) & 0x0f];
++
++                (void) d->gop->Blt(d->gop, NULL, EfiBltVideoToVideo,
++                                   d->x_off, d->y_off + ch,
++                                   d->x_off, d->y_off,
++                                   n_cols * cw, (n_rows - 1) * ch, 0);
++                (void) d->gop->Blt(d->gop, &bg, EfiBltVideoFill, 0, 0,
++                                   d->x_off, d->y_off + (n_rows - 1) * ch,
++                                   n_cols * cw, ch, 0);
++        }
++}
++
++static void cursor_newline(void) {
++        textfb_mode.CursorRow++;
++        if ((size_t) textfb_mode.CursorRow >= n_rows) {
++                scroll_up();
++                textfb_mode.CursorRow = n_rows - 1;
++        }
++}
++
++/* EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL implementation. */
++
++static EFI_STATUS EFIAPI textfb_reset(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this, bool extended) {
++        return textfb_proto.ClearScreen(this);
++}
++
++static EFI_STATUS EFIAPI textfb_output_string(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this, char16_t *s) {
++        if (!s)
++                return EFI_INVALID_PARAMETER;
++
++        for (; *s; s++)
++                switch (*s) {
++                case '\r':
++                        textfb_mode.CursorColumn = 0;
++                        break;
++
++                case '\n':
++                        cursor_newline();
++                        break;
++
++                case '\b':
++                        if (textfb_mode.CursorColumn > 0)
++                                textfb_mode.CursorColumn--;
++                        break;
++
++                case '\t':
++                        /* Next multiple of 8, as the spec's terminals do. */
++                        textfb_mode.CursorColumn = (textfb_mode.CursorColumn + 8) & ~7;
++                        if ((size_t) textfb_mode.CursorColumn >= n_cols) {
++                                textfb_mode.CursorColumn = 0;
++                                cursor_newline();
++                        }
++                        break;
++
++                default:
++                        if ((size_t) textfb_mode.CursorColumn >= n_cols) {
++                                textfb_mode.CursorColumn = 0;
++                                cursor_newline();
++                        }
++
++                        write_cell(textfb_mode.CursorColumn,
++                                   textfb_mode.CursorRow,
++                                   *s,
++                                   textfb_mode.Attribute);
++                        textfb_mode.CursorColumn++;
++                }
++
++        return EFI_SUCCESS;
++}
++
++/* Reporting the truth here is what makes boot.c's unicode_supported() fall back to ASCII box
++ * drawing instead of asking us for glyphs the font does not have. */
++static EFI_STATUS EFIAPI textfb_test_string(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this, char16_t *s) {
++        if (!s)
++                return EFI_INVALID_PARAMETER;
++
++        for (; *s; s++)
++                if (!IN_SET(*s, '\r', '\n', '\b', '\t') &&
++                    (*s < FONT_FIRST_CHAR || *s > FONT_LAST_CHAR))
++                        return EFI_UNSUPPORTED;
++
++        return EFI_SUCCESS;
++}
++
++static EFI_STATUS EFIAPI textfb_query_mode(
++                EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this, size_t mode, size_t *ret_cols, size_t *ret_rows) {
++        if (mode >= N_MODES)
++                return EFI_UNSUPPORTED;
++        if (!ret_cols || !ret_rows)
++                return EFI_INVALID_PARAMETER;
++
++        size_t cols, rows;
++        if (!layout((int32_t) mode, /* apply= */ false, &cols, &rows))
++                return EFI_UNSUPPORTED;
++
++        *ret_cols = cols;
++        *ret_rows = rows;
++        return EFI_SUCCESS;
++}
++
++static EFI_STATUS EFIAPI textfb_set_mode(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this, size_t mode) {
++        if (mode >= N_MODES)
++                return EFI_UNSUPPORTED;
++
++        size_t cols, rows;
++        if (!layout((int32_t) mode, /* apply= */ true, &cols, &rows)) {
++                /* Put the layout we had before probing this mode back. */
++                (void) layout(textfb_mode.Mode, /* apply= */ true, &cols, &rows);
++                return EFI_UNSUPPORTED;
++        }
++
++        if (cols != n_cols || rows != n_rows) {
++                grid = xrealloc(grid, n_cols * n_rows * sizeof(Cell), cols * rows * sizeof(Cell));
++                n_cols = cols;
++                n_rows = rows;
++                generation++;
++        }
++
++        textfb_mode.Mode = mode;
++        ensure_cell_buf();
++
++        for (size_t i = 0; i < n_cols * n_rows; i++) {
++                Cell blank = { .c = ' ', .attr = textfb_mode.Attribute };
++                grid[i] = blank;
++        }
++
++        textfb_mode.CursorColumn = 0;
++        textfb_mode.CursorRow = 0;
++
++        FOREACH_ARRAY(d, displays, n_displays)
++                fill_display(d, textfb_mode.Attribute);
++
++        return EFI_SUCCESS;
++}
++
++static EFI_STATUS EFIAPI textfb_set_attribute(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this, size_t attr) {
++        textfb_mode.Attribute = attr & 0xff;
++        return EFI_SUCCESS;
++}
++
++static EFI_STATUS EFIAPI textfb_clear_screen(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this) {
++        for (size_t i = 0; i < n_cols * n_rows; i++) {
++                Cell blank = { .c = ' ', .attr = textfb_mode.Attribute };
++                grid[i] = blank;
++        }
++
++        textfb_mode.CursorColumn = 0;
++        textfb_mode.CursorRow = 0;
++
++        FOREACH_ARRAY(d, displays, n_displays)
++                fill_display(d, textfb_mode.Attribute);
++
++        return EFI_SUCCESS;
++}
++
++static EFI_STATUS EFIAPI textfb_set_cursor_position(
++                EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this, size_t col, size_t row) {
++        if (col >= n_cols || row >= n_rows)
++                return EFI_UNSUPPORTED;
++
++        textfb_mode.CursorColumn = col;
++        textfb_mode.CursorRow = row;
++        return EFI_SUCCESS;
++}
++
++/* The menu and line editor draw their own caret by swapping colours, so there is nothing to do. */
++static EFI_STATUS EFIAPI textfb_enable_cursor(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *this, bool visible) {
++        textfb_mode.CursorVisible = visible;
++        return EFI_SUCCESS;
++}
++
++bool textfb_active(void) {
++        return saved_conout;
++}
++
++/* Bumped whenever the character grid changes size, so the menu knows to recompute its layout. */
++uint64_t textfb_generation(void) {
++        return generation;
++}
++
++bool textfb_init(void) {
++        if (textfb_active())
++                return true;
++
++        /* Coming back after a failed chainload: the renderer is still set up, just not installed. */
++        if (initialized) {
++                saved_conout = ST->ConOut;
++                ST->ConOut = &textfb_proto;
++                repaint_all();
++                return true;
++        }
++
++        n_displays = gop_enumerate(&displays);
++        if (n_displays == 0)
++                return false;
++
++        textfb_mode = (TextFbMode) {
++                .MaxMode = N_MODES,
++                .Mode = 0,
++                .Attribute = EFI_TEXT_ATTR(EFI_LIGHTGRAY, EFI_BLACK),
++        };
++
++        size_t cols, rows;
++        if (!layout(0, /* apply= */ true, &cols, &rows)) {
++                log_debug("No display can show a usable text grid, leaving the firmware console alone.");
++                displays = mfree(displays);
++                n_displays = 0;
++                return false;
++        }
++
++        n_cols = cols;
++        n_rows = rows;
++        grid = xnew(Cell, n_cols * n_rows);
++        for (size_t i = 0; i < n_cols * n_rows; i++) {
++                Cell blank = { .c = ' ', .attr = textfb_mode.Attribute };
++                grid[i] = blank;
++        }
++        ensure_cell_buf();
++
++        textfb_proto = (EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL) {
++                .Reset = textfb_reset,
++                .OutputString = textfb_output_string,
++                .TestString = textfb_test_string,
++                .QueryMode = textfb_query_mode,
++                .SetMode = textfb_set_mode,
++                .SetAttribute = textfb_set_attribute,
++                .ClearScreen = textfb_clear_screen,
++                .SetCursorPosition = textfb_set_cursor_position,
++                .EnableCursor = textfb_enable_cursor,
++                .Mode = (void *) &textfb_mode,
++        };
++
++        FOREACH_ARRAY(d, displays, n_displays)
++                fill_display(d, textfb_mode.Attribute);
++
++        /* Taking over ST->ConOut means util.c, efi-string.c and efi-log.c keep working untouched. */
++        saved_conout = ST->ConOut;
++        ST->ConOut = &textfb_proto;
++
++        initialized = true;
++        log_debug("Text console now spans %zu display(s) at %zux%zu characters.", n_displays, n_cols, n_rows);
++        return true;
++}
++
++void textfb_restore(void) {
++        if (!textfb_active())
++                return;
++
++        ST->ConOut = saved_conout;
++        saved_conout = NULL;
++}
++
++/* Rebuilds the shared grid after the display set changed. Bumps the generation so the menu knows to
++ * redo its own layout. */
++static void relayout(void) {
++        size_t cols, rows;
++
++        if (!layout(textfb_mode.Mode, /* apply= */ true, &cols, &rows))
++                return;
++
++        if (cols != n_cols || rows != n_rows) {
++                grid = xrealloc(grid, n_cols * n_rows * sizeof(Cell), cols * rows * sizeof(Cell));
++                n_cols = cols;
++                n_rows = rows;
++                generation++;
++
++                for (size_t i = 0; i < n_cols * n_rows; i++) {
++                        Cell blank = { .c = ' ', .attr = textfb_mode.Attribute };
++                        grid[i] = blank;
++                }
++                textfb_mode.CursorColumn = 0;
++                textfb_mode.CursorRow = 0;
++        }
++
++        ensure_cell_buf();
++}
++
++bool textfb_poll(bool allow_reconnect) {
++        if (!textfb_active())
++                return false;
++
++        /* Reconnecting replaces the firmware's GOP instances, which invalidates every pointer and
++         * handle we are holding, so the only safe move afterwards is to start over. */
++        if (allow_reconnect && gop_force_reconnect() == EFI_SUCCESS) {
++                displays = mfree(displays);
++                n_displays = gop_enumerate(&displays);
++
++                if (n_displays == 0) {
++                        /* We have nothing to draw on any more -- give the console back. */
++                        log_debug("No displays survived the reconnect, restoring the firmware console.");
++                        initialized = false;
++                        textfb_restore();
++                        return false;
++                }
++
++                relayout();
++                repaint_all();
++                return true;
++        }
++
++        bool changed = false;
++
++        FOREACH_ARRAY(d, displays, n_displays)
++                if (gop_reassert_mode(d))
++                        changed = true;
++
++        size_t added = gop_rescan(&displays, n_displays);
++        if (added > 0) {
++                n_displays += added;
++                log_debug("Picked up %zu new display(s), now %zu.", added, n_displays);
++
++                /* A new display can be smaller than the others, which shrinks the shared grid. */
++                relayout();
++                changed = true;
++        }
++
++        if (changed)
++                repaint_all();
++
++        return changed;
++}
++
++size_t textfb_n_displays(void) {
++        return n_displays;
++}
++
++bool textfb_describe(
++                size_t i,
++                uint32_t *ret_width,
++                uint32_t *ret_height,
++                uint32_t *ret_native_width,
++                uint32_t *ret_native_height,
++                uint32_t *ret_font_scale) {
++
++        if (i >= n_displays)
++                return false;
++
++        if (ret_width)
++                *ret_width = displays[i].width;
++        if (ret_height)
++                *ret_height = displays[i].height;
++        if (ret_native_width)
++                *ret_native_width = displays[i].native_width;
++        if (ret_native_height)
++                *ret_native_height = displays[i].native_height;
++        if (ret_font_scale)
++                *ret_font_scale = displays[i].font_scale;
++
++        return true;
++}
+diff --git a/src/boot/textfb.h b/src/boot/textfb.h
+new file mode 100644
+index 0000000000..dccd5f0fb4
+--- /dev/null
++++ b/src/boot/textfb.h
+@@ -0,0 +1,36 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include "efi.h"
++
++/* A multi-display text console. Implements EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL over every GOP the
++ * firmware exposes and installs itself as ST->ConOut, so sd-boot's existing output goes to all
++ * displays at once -- each at its own native resolution, with the font scaled to suit. The logical
++ * character grid is shared (it is the smallest grid every display can show), so the displays mirror
++ * each other without being forced into a common pixel mode the way ConSplitter forces them. */
++
++bool textfb_init(void);
++
++bool textfb_active(void);
++
++/* Hands ST->ConOut back to the firmware. Must happen before chainloading, since our protocol lives
++ * in sd-boot's own memory. */
++void textfb_restore(void);
++
++/* Picks up displays that appeared since init and re-asserts modes on the ones we know, which is
++ * what can wake a monitor that was asleep when sd-boot started. True if anything changed. */
++bool textfb_poll(bool allow_reconnect);
++
++size_t textfb_n_displays(void);
++
++/* For the menu's status screen. */
++bool textfb_describe(
++                size_t i,
++                uint32_t *ret_width,
++                uint32_t *ret_height,
++                uint32_t *ret_native_width,
++                uint32_t *ret_native_height,
++                uint32_t *ret_font_scale);
++
++/* Changes whenever the character grid is resized. */
++uint64_t textfb_generation(void);
+diff --git a/src/fundamental/edid.c b/src/fundamental/edid.c
+index 980a3989b7..9283d033ea 100644
+--- a/src/fundamental/edid.c
++++ b/src/fundamental/edid.c
+@@ -51,3 +51,28 @@ int edid_get_panel_id(const EdidHeader *edid_header, char16_t ret_panel[static 8
+         ret_panel[7] = L'\0';
+         return 0;
+ }
++
++/* Native resolution from the first detailed timing descriptor at offset 54. EDID lists the
++ * preferred timing there, which for a fixed-pixel panel is its native mode. */
++int edid_get_preferred_mode(const void *blob, size_t blob_size, uint32_t *ret_width, uint32_t *ret_height) {
++        assert(ret_width);
++        assert(ret_height);
++
++        if (blob_size < 128)
++                return -EINVAL;
++
++        const uint8_t *dtd = (const uint8_t *) ASSERT_PTR(blob) + 54;
++
++        /* A zero pixel clock means this slot holds a display descriptor, not a timing. */
++        if (dtd[0] == 0 && dtd[1] == 0)
++                return -EINVAL;
++
++        uint32_t w = (uint32_t) dtd[2] | (((uint32_t) dtd[4] & 0xF0) << 4);
++        uint32_t h = (uint32_t) dtd[5] | (((uint32_t) dtd[7] & 0xF0) << 4);
++        if (w == 0 || h == 0)
++                return -EINVAL;
++
++        *ret_width = w;
++        *ret_height = h;
++        return 0;
++}
+diff --git a/src/fundamental/edid.h b/src/fundamental/edid.h
+index 6c5930f4c6..cd5ecee1dc 100644
+--- a/src/fundamental/edid.h
++++ b/src/fundamental/edid.h
+@@ -26,3 +26,5 @@ typedef struct EdidHeader {
+ 
+ int edid_parse_blob(const void *blob, size_t blob_size, EdidHeader *ret_header);
+ int edid_get_panel_id(const EdidHeader *edid_header, char16_t ret_panel[static 8]);
++
++int edid_get_preferred_mode(const void *blob, size_t blob_size, uint32_t *ret_width, uint32_t *ret_height);

@@ -2,12 +2,18 @@
 {
   boot = {
     loader = {
+      # Intentional: null is `timeout menu-force`, so the menu always waits for input.
       timeout = null;
 
       systemd-boot = {
         enable = true;
-        consoleMode = "max";
+        # The patched loader reuses the console mode as its font scale; "max" would force the largest.
+        consoleMode = "auto";
         configurationLimit = 5;
+
+        # Patched loader that mirrors the menu to every display and reads the 8BitDo pad.
+        # Stock sd-boot stays the UEFI default; reach this one with `sdboot-mg-next-boot`.
+        multigop.enable = true;
         windows = {
           "tiny-11-pro" = {
             title = "Tiny 11 Pro";

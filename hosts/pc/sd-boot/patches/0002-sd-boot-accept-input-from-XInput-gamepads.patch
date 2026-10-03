@@ -1,0 +1,739 @@
+From cf4dd44c994c2d4d5d3c9df1409ce6d9578746f7 Mon Sep 17 00:00:00 2001
+From: Your Name <gamefroggy16@gmail.com>
+Date: Sat, 3 Oct 2026 21:40:28 +0000
+Subject: [PATCH 2/2] sd-boot: accept input from XInput gamepads
+
+The boot menu can only be driven from EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL, and an
+XInput pad is not reachable that way: it presents a vendor-specific interface
+(class 0xff, subclass 0x5d, protocol 0x01) rather than USB HID, so no firmware
+publishes a text-input protocol for it.
+
+UsbBusDxe does install EFI_USB_IO_PROTOCOL on every interface it enumerates
+whatever the class, so claim the interface and drive its interrupt IN endpoint
+ourselves. Reports are decoded into sd-boot key codes and pushed onto a small
+queue; the callback signals an event that console_key_read() adds to the set it
+already waits on, so no polling loop is needed.
+
+Matching on the interface triple rather than a VID/PID list means any XInput pad
+works, 8BitDo 2.4GHz dongles included, and it keeps us off interfaces the
+firmware is itself driving -- relaxing the filter to HID was enough to claim the
+firmware USB keyboard endpoint during testing.
+
+Presses are edge triggered, since a held direction would otherwise run the
+selection away. Transfers are cancelled before chainloading: the firmware would
+keep calling a callback that points into sd-boot memory. Xbox One style GIP pads
+are detected and named in the status screen but not driven; they need a power-on
+packet and a different report layout.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+---
+ src/boot/boot.c         |  27 ++-
+ src/boot/console.c      |  23 ++-
+ src/boot/efi.h          |   2 +-
+ src/boot/gamepad.c      | 359 ++++++++++++++++++++++++++++++++++++++++
+ src/boot/gamepad.h      |  25 +++
+ src/boot/meson.build    |   1 +
+ src/boot/proto/usb-io.h | 134 +++++++++++++++
+ 7 files changed, 563 insertions(+), 8 deletions(-)
+ create mode 100644 src/boot/gamepad.c
+ create mode 100644 src/boot/gamepad.h
+ create mode 100644 src/boot/proto/usb-io.h
+
+diff --git a/src/boot/boot.c b/src/boot/boot.c
+index 9e89c0838e..17a466b842 100644
+--- a/src/boot/boot.c
++++ b/src/boot/boot.c
+@@ -28,6 +28,7 @@
+ #include "random-seed.h"
+ #include "sbat.h"
+ #include "secure-boot.h"
++#include "gamepad.h"
+ #include "shim.h"
+ #include "textfb.h"
+ #include "smbios.h"
+@@ -171,6 +172,7 @@ typedef struct {
+         bool beep;
+         bool multigop;
+         bool multigop_reconnect;
++        bool gamepad;
+         bool sysfail_occurred;
+         int64_t console_mode;
+         int64_t console_mode_efivar;
+@@ -365,6 +367,17 @@ static void print_status(Config *config, char16_t *loaded_image_path) {
+         } else
+                 printf("      mirrored displays: inactive (firmware console)\n");
+ 
++        if (gamepad_n_devices() > 0)
++                for (size_t i = 0; i < gamepad_n_devices(); i++) {
++                        uint16_t vid, pid;
++                        const char *kind;
++
++                        if (gamepad_describe(i, &vid, &pid, &kind))
++                                printf("             gamepad %zu: %04x:%04x %s\n", i, vid, pid, kind);
++                }
++        else
++                printf("              gamepads: none detected\n");
++
+         if (!ps_continue())
+                 return;
+ 
+@@ -394,6 +407,7 @@ static void print_status(Config *config, char16_t *loaded_image_path) {
+         printf("                          beep: %ls\n", yes_no(config->beep));
+         printf("                      multigop: %ls\n", yes_no(config->multigop));
+         printf("            multigop-reconnect: %ls\n", yes_no(config->multigop_reconnect));
++        printf("                       gamepad: %ls\n", yes_no(config->gamepad));
+         printf("          reboot-for-bitlocker: %ls\n", yes_no(config->reboot_for_bitlocker));
+         printf("               reboot-on-error: %s\n",  reboot_on_error_to_string(config->reboot_on_error));
+         printf("            secure-boot-enroll: %s\n",  secure_boot_enroll_to_string(config->secure_boot_enroll));
+@@ -1204,6 +1218,10 @@ static void config_defaults_load_from_file(Config *config, char *content) {
+                         if (!parse_boolean(value, &config->multigop_reconnect))
+                                 log_warning("Error parsing 'multigop-reconnect' config option, ignoring: %s", value);
+ 
++                } else if (streq8(key, "gamepad")) {
++                        if (!parse_boolean(value, &config->gamepad))
++                                log_warning("Error parsing 'gamepad' config option, ignoring: %s", value);
++
+                 } else if (streq8(key, "reboot-for-bitlocker")) {
+                         if (!parse_boolean(value, &config->reboot_for_bitlocker))
+                                 log_warning("Error parsing 'reboot-for-bitlocker' config option, ignoring: %s",
+@@ -1643,6 +1661,7 @@ static void config_load_defaults(Config *config, EFI_FILE *root_dir) {
+         *config = (Config) {
+                 .editor = true,
+                 .multigop = true,
++                .gamepad = true,
+                 .auto_entries = true,
+                 .auto_firmware = true,
+                 .reboot_on_error = REBOOT_AUTO,
+@@ -3538,8 +3557,12 @@ static EFI_STATUS run(EFI_HANDLE image) {
+                         if (config.multigop && textfb_init())
+                                 console_set_display_reconnect(config.multigop_reconnect);
+ 
++                        if (config.gamepad)
++                                (void) gamepad_init();
++
+                         efivar_set_time_usec(MAKE_GUID_PTR(LOADER), u"LoaderTimeMenuUSec", 0);
+                         if (!menu_run(&config, &entry, loaded_image_path)) {
++                                gamepad_shutdown();
+                                 textfb_restore();
+                                 return EFI_SUCCESS;
+                         }
+@@ -3552,7 +3575,9 @@ static EFI_STATUS run(EFI_HANDLE image) {
+                 if (LOADER_TYPE_PROCESS_RANDOM_SEED(entry->type))
+                         (void) process_random_seed(root_dir);
+ 
+-                /* Our protocol lives in sd-boot's memory, so the next image must get the real one. */
++                /* Both of these hand firmware-held references back before the next image runs: our
++                 * ConOut lives in sd-boot's memory, and the USB callback points into it. */
++                gamepad_shutdown();
+                 textfb_restore();
+ 
+                 err = ASSERT_PTR(entry->call)(entry, root_dir, image);
+diff --git a/src/boot/console.c b/src/boot/console.c
+index 95a30d5fe4..e46ed5a598 100644
+--- a/src/boot/console.c
++++ b/src/boot/console.c
+@@ -4,6 +4,7 @@
+ #include "device-path-util.h"
+ #include "efi-log.h"
+ #include "efi-string.h"
++#include "gamepad.h"
+ #include "proto/graphics-output.h"
+ #include "proto/pci-io.h"
+ #include "string-util.h"
+@@ -89,12 +90,18 @@ EFI_STATUS console_key_read(uint64_t *ret_key, uint64_t timeout_usec) {
+         if (err != EFI_SUCCESS)
+                 return log_error_status(err, "Error creating timer event: %m");
+ 
+-        EFI_EVENT events[] = {
+-                timer,
+-                conInEx ? conInEx->WaitForKeyEx : ST->ConIn->WaitForKey,
+-                extraInEx ? extraInEx->WaitForKeyEx : NULL,
+-        };
+-        size_t n_events = extraInEx ? 3 : 2;
++        EFI_EVENT events[4];
++        size_t n_events = 0;
++
++        events[n_events++] = timer;
++        events[n_events++] = conInEx ? conInEx->WaitForKeyEx : ST->ConIn->WaitForKey;
++        if (extraInEx)
++                events[n_events++] = extraInEx->WaitForKeyEx;
++
++        /* A gamepad, if we are driving one, is just another thing to wait on. */
++        EFI_EVENT pad_event = gamepad_event();
++        if (pad_event)
++                events[n_events++] = pad_event;
+ 
+         /* Watchdog rearming loop in case the user never provides us with input or some
+          * broken firmware never returns from WaitForEvent. */
+@@ -142,6 +149,10 @@ EFI_STATUS console_key_read(uint64_t *ret_key, uint64_t timeout_usec) {
+                 return EFI_TIMEOUT;
+         }
+ 
++        /* Gamepad presses arrive pre-translated into key codes, so hand one straight back. */
++        if (pad_event && gamepad_read_key(ret_key) == EFI_SUCCESS)
++                return EFI_SUCCESS;
++
+         /* If the extra input device we found returns something, always use that instead
+          * to work around broken firmware freezing on ConIn/ConInEx. */
+         if (extraInEx && BS->CheckEvent(extraInEx->WaitForKeyEx) == EFI_SUCCESS)
+diff --git a/src/boot/efi.h b/src/boot/efi.h
+index 6f08bacb2d..3bdd71aa11 100644
+--- a/src/boot/efi.h
++++ b/src/boot/efi.h
+@@ -286,7 +286,7 @@ typedef struct {
+                         size_t NumberOfEvents,
+                         EFI_EVENT *Event,
+                         size_t *Index);
+-        void *SignalEvent;
++        EFI_STATUS (EFIAPI *SignalEvent)(EFI_EVENT Event);
+         EFI_STATUS (EFIAPI *CloseEvent)(EFI_EVENT Event);
+         EFI_STATUS (EFIAPI *CheckEvent)(EFI_EVENT Event);
+         void *InstallProtocolInterface;
+diff --git a/src/boot/gamepad.c b/src/boot/gamepad.c
+new file mode 100644
+index 0000000000..2b6b5ac528
+--- /dev/null
++++ b/src/boot/gamepad.c
+@@ -0,0 +1,359 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++#include "console.h"
++#include "efi-log.h"
++#include "gamepad.h"
++#include "proto/simple-text-io.h"
++#include "proto/usb-io.h"
++#include "util.h"
++
++/* XInput ("Xbox 360 style") pads present a vendor-specific interface with this triple. Matching on
++ * it rather than a VID/PID list means any XInput pad works, 8BitDo dongles included. */
++#define XINPUT_IF_CLASS    0xffU
++#define XINPUT_IF_SUBCLASS 0x5dU
++#define XINPUT_IF_PROTOCOL 0x01U
++
++/* GIP ("Xbox One style") pads use the same class but need a power-on packet and a different report
++ * layout. Detected so the status screen can say so, but not driven. */
++#define GIP_IF_SUBCLASS    0x47U
++#define GIP_IF_PROTOCOL    0xd0U
++
++#define XINPUT_REPORT_SIZE 20
++#define XINPUT_REPORT_TYPE_PAD 0x00
++
++/* Byte 2 of the report. */
++#define PAD_DPAD_UP      0x0001U
++#define PAD_DPAD_DOWN    0x0002U
++#define PAD_DPAD_LEFT    0x0004U
++#define PAD_DPAD_RIGHT   0x0008U
++#define PAD_START        0x0010U
++#define PAD_BACK         0x0020U
++#define PAD_LEFT_THUMB   0x0040U
++#define PAD_RIGHT_THUMB  0x0080U
++/* Byte 3, shifted up. */
++#define PAD_LB           0x0100U
++#define PAD_RB           0x0200U
++#define PAD_GUIDE        0x0400U
++#define PAD_A            0x1000U
++#define PAD_B            0x2000U
++#define PAD_X            0x4000U
++#define PAD_Y            0x8000U
++
++/* Analogue sticks double as a d-pad past this much deflection. */
++#define STICK_DEADZONE 16384
++
++#define MAX_PADS 4
++#define KEY_QUEUE_SIZE 16
++
++typedef struct {
++        EFI_USB_IO_PROTOCOL *usb;
++        uint8_t endpoint;
++        uint16_t vid, pid;
++        const char *kind;
++        bool driven;
++        uint16_t prev_buttons;
++} Pad;
++
++static Pad pads[MAX_PADS];
++static size_t n_pads = 0;
++
++/* Written by the firmware's interrupt callback, drained by console_key_read(). */
++static volatile uint64_t key_queue[KEY_QUEUE_SIZE];
++static volatile size_t queue_head = 0, queue_tail = 0;
++static EFI_EVENT key_event = NULL;
++
++static void queue_push(uint64_t key) {
++        size_t next = (queue_tail + 1) % KEY_QUEUE_SIZE;
++
++        /* Drop rather than overwrite: stale presses are worse than missed ones here. */
++        if (next == queue_head)
++                return;
++
++        key_queue[queue_tail] = key;
++        queue_tail = next;
++
++        if (key_event)
++                (void) BS->SignalEvent(key_event);
++}
++
++static uint64_t button_to_key(uint16_t button) {
++        switch (button) {
++        case PAD_DPAD_UP:
++                return KEYPRESS(0, SCAN_UP, 0);
++        case PAD_DPAD_DOWN:
++                return KEYPRESS(0, SCAN_DOWN, 0);
++        case PAD_DPAD_LEFT:
++                return KEYPRESS(0, SCAN_PAGE_UP, 0);
++        case PAD_DPAD_RIGHT:
++                return KEYPRESS(0, SCAN_PAGE_DOWN, 0);
++        case PAD_A:
++        case PAD_START:
++                return KEYPRESS(0, 0, '\r');
++        case PAD_B:
++        case PAD_BACK:
++                return KEYPRESS(0, SCAN_ESC, 0);
++        case PAD_X:
++                return KEYPRESS(0, 0, 'e'); /* edit the command line */
++        case PAD_Y:
++                return KEYPRESS(0, 0, 'p'); /* status screen, so a pad alone can diagnose things */
++        case PAD_GUIDE:
++                return KEYPRESS(0, 0, 'h'); /* help */
++        case PAD_LB:
++                return KEYPRESS(0, SCAN_HOME, 0);
++        case PAD_RB:
++                return KEYPRESS(0, SCAN_END, 0);
++        default:
++                return 0;
++        }
++}
++
++static int16_t read_axis(const uint8_t *report, size_t offset) {
++        return (int16_t) ((uint16_t) report[offset] | ((uint16_t) report[offset + 1] << 8));
++}
++
++static uint16_t decode_buttons(const uint8_t *report) {
++        uint16_t buttons = (uint16_t) report[2] | ((uint16_t) report[3] << 8);
++
++        /* Fold the left stick into the d-pad bits so either works. */
++        int16_t lx = read_axis(report, 6), ly = read_axis(report, 8);
++
++        if (ly > STICK_DEADZONE)
++                buttons |= PAD_DPAD_UP;
++        else if (ly < -STICK_DEADZONE)
++                buttons |= PAD_DPAD_DOWN;
++
++        if (lx < -STICK_DEADZONE)
++                buttons |= PAD_DPAD_LEFT;
++        else if (lx > STICK_DEADZONE)
++                buttons |= PAD_DPAD_RIGHT;
++
++        return buttons;
++}
++
++/* Called by the firmware at TPL_CALLBACK every time the pad reports. */
++static EFI_STATUS EFIAPI report_callback(void *data, size_t data_length, void *context, uint32_t status) {
++        Pad *pad = context;
++
++        if (!pad || !data || status != 0 || data_length < XINPUT_REPORT_SIZE)
++                return EFI_SUCCESS;
++
++        const uint8_t *report = data;
++        if (report[0] != XINPUT_REPORT_TYPE_PAD)
++                return EFI_SUCCESS;
++
++        uint16_t buttons = decode_buttons(report);
++
++        /* Edge trigger only. A held direction must not run the selection away, and the pad keeps
++         * reporting its state whether or not anything changed. */
++        uint16_t pressed = buttons & ~pad->prev_buttons;
++        pad->prev_buttons = buttons;
++
++        for (unsigned bit = 0; bit < 16; bit++) {
++                uint16_t mask = 1U << bit;
++
++                if (!(pressed & mask))
++                        continue;
++
++                uint64_t key = button_to_key(mask);
++                if (key != 0)
++                        queue_push(key);
++        }
++
++        return EFI_SUCCESS;
++}
++
++static bool find_interrupt_in_endpoint(
++                EFI_USB_IO_PROTOCOL *usb,
++                uint8_t n_endpoints,
++                uint8_t *ret_endpoint,
++                size_t *ret_interval,
++                size_t *ret_max_packet) {
++        assert(usb);
++        assert(ret_endpoint);
++        assert(ret_interval);
++        assert(ret_max_packet);
++
++        for (uint8_t i = 0; i < n_endpoints; i++) {
++                EFI_USB_ENDPOINT_DESCRIPTOR ep = {};
++
++                if (usb->UsbGetEndpointDescriptor(usb, i, &ep) != EFI_SUCCESS)
++                        continue;
++                if ((ep.Attributes & USB_ENDPOINT_TYPE_MASK) != USB_ENDPOINT_INTERRUPT)
++                        continue;
++                if (!(ep.EndpointAddress & USB_ENDPOINT_DIR_IN))
++                        continue;
++
++                *ret_endpoint = ep.EndpointAddress;
++                /* Interval is in frames; the firmware wants milliseconds and 0 is not allowed. */
++                *ret_interval = ep.Interval > 0 ? ep.Interval : 8;
++                /* Ask for what the endpoint actually carries rather than assuming the report size;
++                 * XInput endpoints are wider than the 20 bytes we care about. */
++                *ret_max_packet = ep.MaxPacketSize > 0 ? ep.MaxPacketSize : XINPUT_REPORT_SIZE;
++                return true;
++        }
++
++        return false;
++}
++
++static bool pad_claim(EFI_HANDLE handle) {
++        if (n_pads >= MAX_PADS)
++                return false;
++
++        EFI_USB_IO_PROTOCOL *usb = NULL;
++        if (BS->HandleProtocol(handle, MAKE_GUID_PTR(EFI_USB_IO_PROTOCOL), (void **) &usb) != EFI_SUCCESS)
++                return false;
++
++        EFI_USB_INTERFACE_DESCRIPTOR iface = {};
++        if (usb->UsbGetInterfaceDescriptor(usb, &iface) != EFI_SUCCESS)
++                return false;
++        if (iface.InterfaceClass != XINPUT_IF_CLASS)
++                return false;
++
++        bool is_xinput = iface.InterfaceSubClass == XINPUT_IF_SUBCLASS &&
++                        iface.InterfaceProtocol == XINPUT_IF_PROTOCOL;
++        bool is_gip = iface.InterfaceSubClass == GIP_IF_SUBCLASS &&
++                        iface.InterfaceProtocol == GIP_IF_PROTOCOL;
++
++        if (!is_xinput && !is_gip)
++                return false;
++
++        EFI_USB_DEVICE_DESCRIPTOR dev = {};
++        (void) usb->UsbGetDeviceDescriptor(usb, &dev);
++
++        Pad *pad = pads + n_pads;
++        *pad = (Pad) {
++                .usb = usb,
++                .vid = dev.IdVendor,
++                .pid = dev.IdProduct,
++                .kind = is_xinput ? "XInput" : "GIP (unsupported)",
++        };
++
++        if (is_gip) {
++                /* Needs a 0x05 power-on packet and a different report layout. Recorded so the status
++                 * screen can say what was found instead of silently ignoring it. */
++                log_debug("USB %04x:%04x is a GIP pad, which this build does not drive.",
++                          dev.IdVendor, dev.IdProduct);
++                n_pads++;
++                return true;
++        }
++
++        uint8_t endpoint;
++        size_t interval, max_packet;
++        if (!find_interrupt_in_endpoint(usb, iface.NumEndpoints, &endpoint, &interval, &max_packet)) {
++                log_debug("USB %04x:%04x has no interrupt IN endpoint, ignoring.", dev.IdVendor, dev.IdProduct);
++                return false;
++        }
++
++        pad->endpoint = endpoint;
++
++        EFI_STATUS err = usb->UsbAsyncInterruptTransfer(
++                        usb,
++                        endpoint,
++                        /* IsNewTransfer= */ true,
++                        interval,
++                        max_packet,
++                        report_callback,
++                        pad);
++        if (err != EFI_SUCCESS) {
++                log_debug_status(err, "Cannot start interrupt transfer for USB %04x:%04x: %m",
++                                 dev.IdVendor, dev.IdProduct);
++                return false;
++        }
++
++        pad->driven = true;
++        n_pads++;
++
++        log_debug("Driving XInput pad %04x:%04x on endpoint %#x, %zu bytes every %zums.",
++                  dev.IdVendor, dev.IdProduct, endpoint, max_packet, interval);
++        return true;
++}
++
++bool gamepad_init(void) {
++        if (n_pads > 0)
++                return true;
++
++        _cleanup_free_ EFI_HANDLE *handles = NULL;
++        size_t n_handles = 0;
++
++        EFI_STATUS err = BS->LocateHandleBuffer(
++                        ByProtocol, MAKE_GUID_PTR(EFI_USB_IO_PROTOCOL), NULL, &n_handles, &handles);
++        if (err != EFI_SUCCESS) {
++                log_debug_status(err, "No USB I/O protocol handles, no gamepad support: %m");
++                return false;
++        }
++
++        err = BS->CreateEvent(/* Type= */ 0, /* NotifyTpl= */ 0, NULL, NULL, &key_event);
++        if (err != EFI_SUCCESS) {
++                log_debug_status(err, "Cannot create gamepad event: %m");
++                return false;
++        }
++
++        for (size_t i = 0; i < n_handles; i++)
++                (void) pad_claim(handles[i]);
++
++        if (n_pads == 0) {
++                BS->CloseEvent(key_event);
++                key_event = NULL;
++                return false;
++        }
++
++        return true;
++}
++
++EFI_EVENT gamepad_event(void) {
++        return key_event;
++}
++
++EFI_STATUS gamepad_read_key(uint64_t *ret_key) {
++        if (queue_head == queue_tail)
++                return EFI_NOT_READY;
++
++        if (ret_key)
++                *ret_key = key_queue[queue_head];
++        queue_head = (queue_head + 1) % KEY_QUEUE_SIZE;
++
++        /* WaitForEvent() clears the event it returned, so anything still queued would sit here
++         * until the pad happened to report again. Re-arm instead. */
++        if (queue_head != queue_tail && key_event)
++                (void) BS->SignalEvent(key_event);
++
++        return EFI_SUCCESS;
++}
++
++void gamepad_shutdown(void) {
++        FOREACH_ARRAY(pad, pads, n_pads) {
++                if (!pad->driven)
++                        continue;
++
++                /* Passing a null callback with IsNewTransfer false deregisters the transfer. */
++                (void) pad->usb->UsbAsyncInterruptTransfer(
++                                pad->usb, pad->endpoint, /* IsNewTransfer= */ false, 0, 0, NULL, NULL);
++                pad->driven = false;
++        }
++
++        n_pads = 0;
++        queue_head = queue_tail = 0;
++
++        if (key_event) {
++                BS->CloseEvent(key_event);
++                key_event = NULL;
++        }
++}
++
++size_t gamepad_n_devices(void) {
++        return n_pads;
++}
++
++bool gamepad_describe(size_t i, uint16_t *ret_vid, uint16_t *ret_pid, const char **ret_kind) {
++        if (i >= n_pads)
++                return false;
++
++        if (ret_vid)
++                *ret_vid = pads[i].vid;
++        if (ret_pid)
++                *ret_pid = pads[i].pid;
++        if (ret_kind)
++                *ret_kind = pads[i].kind;
++
++        return true;
++}
+diff --git a/src/boot/gamepad.h b/src/boot/gamepad.h
+new file mode 100644
+index 0000000000..f58d001c7d
+--- /dev/null
++++ b/src/boot/gamepad.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include "efi.h"
++
++/* XInput gamepad input for the boot menu. The firmware has no driver for these -- an XInput pad is a
++ * vendor-specific interface, not USB HID -- so we drive the interrupt endpoint ourselves and feed
++ * synthetic key presses into the same event wait console.c already does. */
++
++bool gamepad_init(void);
++
++/* Signalled when a button press is waiting; add it to a WaitForEvent() set. NULL if no pad. */
++EFI_EVENT gamepad_event(void);
++
++/* Pops one translated key press. EFI_NOT_READY if nothing is queued. */
++EFI_STATUS gamepad_read_key(uint64_t *ret_key);
++
++/* Cancels the interrupt transfers. Mandatory before chainloading: the firmware would otherwise keep
++ * calling our callback after sd-boot's memory is gone. */
++void gamepad_shutdown(void);
++
++size_t gamepad_n_devices(void);
++
++/* For the status screen: describes pad i, e.g. "2dc8:310b XInput". */
++bool gamepad_describe(size_t i, uint16_t *ret_vid, uint16_t *ret_pid, const char **ret_kind);
+diff --git a/src/boot/meson.build b/src/boot/meson.build
+index fb65745152..5191e00441 100644
+--- a/src/boot/meson.build
++++ b/src/boot/meson.build
+@@ -322,6 +322,7 @@ libefi_sources = files(
+         'efi-log.c',
+         'efi-string.c',
+         'export-vars.c',
++        'gamepad.c',
+         'gop.c',
+         'graphics.c',
+         'hii.c',
+diff --git a/src/boot/proto/usb-io.h b/src/boot/proto/usb-io.h
+new file mode 100644
+index 0000000000..4132b25c55
+--- /dev/null
++++ b/src/boot/proto/usb-io.h
+@@ -0,0 +1,134 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include "efi.h"
++
++/* UsbBusDxe installs this on every USB interface it enumerates, whatever the device class, which is
++ * what lets us talk to a gamepad the firmware itself has no driver for. */
++#define EFI_USB_IO_PROTOCOL_GUID \
++        GUID_DEF(0x2b2f68d6, 0x0cd2, 0x44cf, 0x8e, 0x8b, 0xbb, 0xa2, 0x0b, 0x1b, 0x5b, 0x75)
++
++typedef enum {
++        EfiUsbDataOut,
++        EfiUsbDataIn,
++        EfiUsbNoData,
++} EFI_USB_DATA_DIRECTION;
++
++typedef struct {
++        uint8_t RequestType;
++        uint8_t Request;
++        uint16_t Value;
++        uint16_t Index;
++        uint16_t Length;
++} _packed_ EFI_USB_DEVICE_REQUEST;
++
++typedef struct {
++        uint8_t Length;
++        uint8_t DescriptorType;
++        uint16_t BcdUSB;
++        uint8_t DeviceClass;
++        uint8_t DeviceSubClass;
++        uint8_t DeviceProtocol;
++        uint8_t MaxPacketSize0;
++        uint16_t IdVendor;
++        uint16_t IdProduct;
++        uint16_t BcdDevice;
++        uint8_t StrManufacturer;
++        uint8_t StrProduct;
++        uint8_t StrSerialNumber;
++        uint8_t NumConfigurations;
++} _packed_ EFI_USB_DEVICE_DESCRIPTOR;
++
++typedef struct {
++        uint8_t Length;
++        uint8_t DescriptorType;
++        uint16_t TotalLength;
++        uint8_t NumInterfaces;
++        uint8_t ConfigurationValue;
++        uint8_t Configuration;
++        uint8_t Attributes;
++        uint8_t MaxPower;
++} _packed_ EFI_USB_CONFIG_DESCRIPTOR;
++
++typedef struct {
++        uint8_t Length;
++        uint8_t DescriptorType;
++        uint8_t InterfaceNumber;
++        uint8_t AlternateSetting;
++        uint8_t NumEndpoints;
++        uint8_t InterfaceClass;
++        uint8_t InterfaceSubClass;
++        uint8_t InterfaceProtocol;
++        uint8_t Interface;
++} _packed_ EFI_USB_INTERFACE_DESCRIPTOR;
++
++typedef struct {
++        uint8_t Length;
++        uint8_t DescriptorType;
++        uint8_t EndpointAddress;
++        uint8_t Attributes;
++        uint16_t MaxPacketSize;
++        uint8_t Interval;
++} _packed_ EFI_USB_ENDPOINT_DESCRIPTOR;
++
++#define USB_ENDPOINT_DIR_IN     0x80U
++#define USB_ENDPOINT_TYPE_MASK  0x03U
++#define USB_ENDPOINT_INTERRUPT  0x03U
++
++typedef EFI_STATUS (EFIAPI *EFI_ASYNC_USB_TRANSFER_CALLBACK)(
++                void *Data,
++                size_t DataLength,
++                void *Context,
++                uint32_t Status);
++
++typedef struct EFI_USB_IO_PROTOCOL EFI_USB_IO_PROTOCOL;
++struct EFI_USB_IO_PROTOCOL {
++        EFI_STATUS (EFIAPI *UsbControlTransfer)(
++                        EFI_USB_IO_PROTOCOL *This,
++                        EFI_USB_DEVICE_REQUEST *Request,
++                        EFI_USB_DATA_DIRECTION Direction,
++                        uint32_t Timeout,
++                        void *Data,
++                        size_t DataLength,
++                        uint32_t *Status);
++        EFI_STATUS (EFIAPI *UsbBulkTransfer)(
++                        EFI_USB_IO_PROTOCOL *This,
++                        uint8_t DeviceEndpoint,
++                        void *Data,
++                        size_t *DataLength,
++                        size_t Timeout,
++                        uint32_t *Status);
++        EFI_STATUS (EFIAPI *UsbAsyncInterruptTransfer)(
++                        EFI_USB_IO_PROTOCOL *This,
++                        uint8_t DeviceEndpoint,
++                        bool IsNewTransfer,
++                        size_t PollingInterval,
++                        size_t DataLength,
++                        EFI_ASYNC_USB_TRANSFER_CALLBACK InterruptCallBack,
++                        void *Context);
++        EFI_STATUS (EFIAPI *UsbSyncInterruptTransfer)(
++                        EFI_USB_IO_PROTOCOL *This,
++                        uint8_t DeviceEndpoint,
++                        void *Data,
++                        size_t *DataLength,
++                        size_t Timeout,
++                        uint32_t *Status);
++        void *UsbIsochronousTransfer;
++        void *UsbAsyncIsochronousTransfer;
++        EFI_STATUS (EFIAPI *UsbGetDeviceDescriptor)(
++                        EFI_USB_IO_PROTOCOL *This,
++                        EFI_USB_DEVICE_DESCRIPTOR *DeviceDescriptor);
++        EFI_STATUS (EFIAPI *UsbGetConfigDescriptor)(
++                        EFI_USB_IO_PROTOCOL *This,
++                        EFI_USB_CONFIG_DESCRIPTOR *ConfigDescriptor);
++        EFI_STATUS (EFIAPI *UsbGetInterfaceDescriptor)(
++                        EFI_USB_IO_PROTOCOL *This,
++                        EFI_USB_INTERFACE_DESCRIPTOR *InterfaceDescriptor);
++        EFI_STATUS (EFIAPI *UsbGetEndpointDescriptor)(
++                        EFI_USB_IO_PROTOCOL *This,
++                        uint8_t EndpointIndex,
++                        EFI_USB_ENDPOINT_DESCRIPTOR *EndpointDescriptor);
++        void *UsbGetStringDescriptor;
++        void *UsbGetSupportedLanguages;
++        EFI_STATUS (EFIAPI *UsbPortReset)(EFI_USB_IO_PROTOCOL *This);
++};

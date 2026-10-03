@@ -8,5 +8,6 @@
 
     ./hardware-configuration.nix
     ./additional-hardware-configuration.nix
+    ../sd-boot/default.nix
   ];
 }
