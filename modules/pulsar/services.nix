@@ -6,6 +6,11 @@
 
   # Security settings
   services.openssh.settings = {
+    # Only the two named logins may start a session at all
+    AllowUsers = [ "sushy" "kubeops" ];
+    X11Forwarding = false;
+    MaxAuthTries = 3;
+
     # Disable password authentication
     PasswordAuthentication = false;
 

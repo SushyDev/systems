@@ -17,6 +17,8 @@
     ./secrets.nix
     ./backups.nix
     ./k3s.nix
+    ./k3s-hardening.nix
+    ./kubeops.nix
     ./flux.nix
     ./falco.nix
 
