@@ -111,6 +111,26 @@ in
         ];
       };
 
+      # falcoctl's two containers ship with `resources: {}`, so they were the
+      # only things here the scheduler could not size. No securityContext:
+      # artifact install/follow write rules and plugins to disk by design.
+      falcoctl.artifact = {
+        install.resources = {
+          requests = {
+            cpu = "50m";
+            memory = "64Mi";
+          };
+          limits.memory = "256Mi";
+        };
+        follow.resources = {
+          requests = {
+            cpu = "50m";
+            memory = "64Mi";
+          };
+          limits.memory = "256Mi";
+        };
+      };
+
       falcosidekick = {
         enabled = true;
         replicaCount = 1;
@@ -120,6 +140,26 @@ in
           # all CRITICAL; this leaves headroom for upstream rules without
           # drowning the channel.
           discord.minimumpriority = "notice";
+
+          # The chart adds a Service port for every notlspath even when the TLS
+          # server is not deployed, leaving port 2810 pointing at a container
+          # port nothing declares. Emptying the list drops the phantom port.
+          tlsserver.notlspaths = "";
+        };
+
+        resources = {
+          requests = {
+            cpu = "50m";
+            memory = "64Mi";
+          };
+          limits.memory = "128Mi";
+        };
+
+        # A Go HTTP relay: no disk writes, no new privileges.
+        securityContext = {
+          allowPrivilegeEscalation = false;
+          readOnlyRootFilesystem = true;
+          capabilities.drop = [ "ALL" ];
         };
       };
     };
