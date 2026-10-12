@@ -51,6 +51,7 @@ in
 {
   users.users.${user} = {
     isNormalUser = true;
+    group = user;
     description = "Least-privilege Kubernetes operator";
     home = home;
     # No password, no wheel, no docker, no k3s group.
@@ -60,6 +61,8 @@ in
       "no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDK2znreT4nuwGavrkejyLgVUvVeSgL/9T/+wXOZdhOr"
     ];
   };
+
+  users.groups.${user} = { };
 
   # The global KUBECONFIG points at the k3s admin config; this user must not use it.
   environment.extraInit = ''
