@@ -47,7 +47,7 @@ let
 in
 {
   services.k3s.extraFlags = [
-    "--pod-security-admission-config-file=${psaConfig}"
+    "--kube-apiserver-arg=admission-control-config-file=${psaConfig}"
     "--kube-apiserver-arg=audit-policy-file=${auditPolicy}"
     "--kube-apiserver-arg=audit-log-path=/var/log/kubernetes/audit.log"
     "--kube-apiserver-arg=audit-log-maxage=30"
