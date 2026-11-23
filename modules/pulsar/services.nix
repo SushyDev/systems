@@ -1,4 +1,4 @@
-{ ... }:
+{ pkgs, ... }:
 {
   # --- SSH
   services.openssh.enable = true;
@@ -66,6 +66,43 @@
       enable = true;
       multipliers = "1 2 4 8 16 32 64";
       maxtime = "168h";
+    };
+  };
+
+  # fail2ban's journal reader stopped consuming entries on 2026-11-17 and sat
+  # there for six days. The process stayed alive and still answered
+  # `fail2ban-client ping`, so Restart= never fired and nothing looked wrong --
+  # 1110 matchable sshd failures in 24h produced 0 bans. This compares what
+  # sshd reports against what fail2ban noticed, and bounces it on a mismatch.
+  systemd.services.fail2ban-stall-check = {
+    description = "Restart fail2ban if it has stopped reading the journal";
+    serviceConfig.Type = "oneshot";
+    path = [
+      pkgs.systemd
+      pkgs.gnugrep
+      pkgs.coreutils
+    ];
+    script = ''
+      sshd_fails=$(journalctl -u sshd --since '-60 min' -o cat 2>/dev/null \
+        | grep -cE 'Invalid user|Failed password|Connection closed by (invalid|authenticating) user' || true)
+      f2b_found=$(journalctl -u fail2ban --since '-60 min' -o cat 2>/dev/null \
+        | grep -c 'Found' || true)
+
+      # A quiet hour is not a stall, hence the floor: act only when sshd plainly
+      # had something to report and fail2ban logged none of it.
+      if [ "''${sshd_fails:-0}" -ge 10 ] && [ "''${f2b_found:-0}" -eq 0 ]; then
+        echo "fail2ban logged 0 of $sshd_fails sshd failures in the last hour; restarting"
+        systemctl restart fail2ban
+      fi
+    '';
+  };
+
+  systemd.timers.fail2ban-stall-check = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "hourly";
+      RandomizedDelaySec = "5m";
+      Persistent = true;
     };
   };
 
