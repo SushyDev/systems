@@ -6,6 +6,19 @@
   ...
 }:
 {
+  # claude-code from the nixpkgs-claude input rather than the system pin, which
+  # trails it by months. Instantiated with allowUnfree because the package is
+  # unfree and a bare legacyPackages reference would refuse to evaluate.
+  nixpkgs.overlays = [
+    (_: prev: {
+      claude-code =
+        (import inputs.nixpkgs-claude {
+          inherit (prev.stdenv.hostPlatform) system;
+          config.allowUnfree = true;
+        }).claude-code;
+    })
+  ];
+
   home-manager.users.sushy = {
     home.stateVersion = "25.05";
 

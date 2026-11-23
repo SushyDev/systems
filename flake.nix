@@ -68,6 +68,11 @@
     claude-lite = {
       url = "path:/Users/work/Documents/Projects/claude-lite";
     };
+
+    # claude-code ships several releases a week and the nixpkgs pin above is
+    # months behind it. Overlaid in modules/pulsar/home-manager.nix, so this
+    # tree supplies that one package and nothing else on the host moves.
+    nixpkgs-claude.url = "github:nixos/nixpkgs/nixos-unstable";
   };
 
   outputs =
