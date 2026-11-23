@@ -1,0 +1,179 @@
+# Falco rules for the StyleSmuggler / CVE-2026-75650 implant family.
+#
+# These detect what the malware DOES rather than where it currently lives, so
+# they survive the dropper rotating paths -- it has already moved between
+# ~/.local/share/.gvfsd/, ~/.cache/fontconfig/ and /tmp/.fc-<hex>/ across
+# observed variants.
+#
+# Kept as a plain YAML file rather than inline Nix: the k3s module serialises
+# chart values into a double-quoted YAML scalar containing JSON, and line
+# folding corrupts "\n" escapes that straddle the wrap column. This file is
+# mounted via its own ConfigMap instead.
+
+# NOTE: an earlier revision defined a `pulsar_web_user` macro scoped to uid 33.
+# It is deliberately gone: the rules below key on `user.uid != 0` instead, which
+# catches any non-root identity rather than only www-data, and Falco warns on
+# every startup about a macro that nothing references.
+
+# The fvs FUSE mount lives under /dev/shm and serves media files. It is never an
+# exec source, but exclude it explicitly so a later tweak cannot start alerting
+# on library reads.
+- macro: pulsar_fvs_mount
+  condition: (proc.exepath startswith "/dev/shm/fvs/")
+
+- rule: Binary executed from temp or cache directory
+  desc: >
+    StyleSmuggler drops its second stage into a temporary or cache directory and
+    executes it from there. Observed paths include /tmp/.fc-<hex>/fc-cache,
+    /tmp/.chrony-<hex>/chronyd and ~/.cache/fontconfig/fc-cache.
+  condition: >
+    spawned_process
+    and not pulsar_fvs_mount
+    and (proc.exepath startswith "/tmp/"
+    or proc.exepath startswith "/var/tmp/"
+    or proc.exepath startswith "/dev/shm/"
+    or proc.exepath contains "/.cache/fontconfig/"
+    or proc.exepath contains "/.local/share/.gvfsd/")
+  output: >
+    Binary executed from a temp or cache path (exe=%proc.exepath
+    cmd=%proc.cmdline user=%user.name uid=%user.uid parent=%proc.pname
+    container=%container.name image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, execution]
+
+- rule: System daemon name spawned by non-root user
+  desc: >
+    The implant masquerades as a kernel worker or a routine system daemon. A
+    real kworker is a kernel thread and always root; fc-cache or chronyd started
+    by the web-server user is not legitimate.
+  condition: >
+    spawned_process
+    and user.uid != 0
+    and (proc.name in (fc-cache, chronyd, gvfsd-user)
+    or proc.name contains "kworker")
+  output: >
+    Process masquerading as a system daemon started by a non-root user
+    (proc=%proc.name exe=%proc.exepath cmd=%proc.cmdline user=%user.name
+    uid=%user.uid parent=%proc.pname container=%container.name
+    image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, defense_evasion]
+
+- rule: Cron persistence written by non-root user
+  desc: >
+    The implant reinstalls itself from cron every five minutes. Nothing running
+    as the web-server user has any business writing a crontab. The host itself
+    runs no cron at all, so a hit here is either a container's own crond or an
+    intrusion.
+  condition: >
+    open_write
+    and user.uid != 0
+    and (fd.name startswith "/var/spool/cron/"
+    or fd.name startswith "/etc/cron"
+    or fd.name startswith "/etc/crontabs/")
+  output: >
+    Cron entry written by a non-root user (file=%fd.name proc=%proc.name
+    cmd=%proc.cmdline user=%user.name uid=%user.uid container=%container.name
+    image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, persistence]
+
+- rule: Outbound connection to known StyleSmuggler C2
+  desc: Published command-and-control endpoints for this campaign.
+  condition: >
+    outbound
+    and fd.sip in ("185.157.160.251", "99.84.67.186")
+  output: >
+    Outbound connection to a known C2 address (dest=%fd.sip:%fd.sport
+    proto=%fd.l4proto proc=%proc.name cmd=%proc.cmdline user=%user.name
+    container=%container.name image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, c2]
+
+# time.cloudflare.com. WARP syncs against these legitimately.
+#
+# The exception used to also require container.image.repository = caomingjun/warp
+# and stopped matching on 2026-09-23: Falco reported container.id=host and an
+# empty image for warp-svc's tokio worker threads, even though the process sits
+# in a normal docker cgroup. The threads predate the running Falco, so it never
+# saw the clone that would have resolved the cgroup. Keyed on the destination
+# alone now -- these two addresses are Cloudflare's anycast NTP service and
+# cannot host a C2, and beaconing to any other NTP-speaking host still alerts.
+- list: cloudflare_ntp_servers
+  items: ["162.159.200.1", "162.159.200.123"]
+
+- rule: Unexpected outbound NTP traffic
+  desc: >
+    The implant beacons over UDP/123 to NTP-impersonating hosts. Only the host
+    time daemon should speak NTP; a container doing so is not normal.
+  condition: >
+    outbound
+    and fd.l4proto = udp
+    and fd.sport = 123
+    and not proc.name in (systemd-timesyn, chronyd, ntpd, sntp)
+    and not fd.sip in (cloudflare_ntp_servers)
+  output: >
+    Unexpected NTP traffic from a non-timekeeping process (dest=%fd.sip:%fd.sport
+    proc=%proc.name cmd=%proc.cmdline user=%user.name container=%container.name
+    image=%container.image.repository)
+  priority: CRITICAL
+  tags: [stylesmuggler, c2]
+
+# Overrides upstream's (never_true) hook in "Read sensitive file untrusted".
+# Both clauses are host-only and pin the parent, so the same binary name run
+# from anywhere else still alerts.
+- macro: user_known_read_sensitive_files_activities
+  condition: >
+    (proc.name = perl
+     and proc.pname = activate
+     and proc.cmdline contains "update-users-groups.pl")
+    or
+    (proc.pname = systemd
+     and proc.exepath endswith "/lib/systemd/systemd-executor"
+     and fd.name in (systemd_pam_sensitive_files))
+
+# systemd-executor reads these when PAM opens a session -- every `systemd
+# --user` start, i.e. every SSH login, fires three of them. Matched by path
+# suffix rather than the full /nix/store path, so a systemd bump does not
+# silently re-enable the noise. Verified 2026-09-13: proc.name is the numeric
+# fd systemd passes as argv[0] ("18"), so it is useless for matching.
+- list: systemd_pam_sensitive_files
+  items: ["/etc/shadow", "/etc/pam.d/systemd-user", "/etc/pam.d/other"]
+
+
+########################################################################
+# Watchtower image churn -- two upstream rules, same 04:00 root cause
+########################################################################
+
+# Watchtower pulls on "0 0 4 * * *". While dockerd extracts a Debian-based
+# layer it opens that layer's own /var/log/{btmp,wtmp,faillog,lastlog,dpkg.log,
+# alternatives.log,fontconfig.log} with O_TRUNC. Falco renders those as bare
+# /var/log/... paths -- it cannot resolve the extraction dirfd back to the
+# overlay2 root -- so there is no path left to key on and the process identity
+# has to carry it. Upstream ships containerd_activities for exactly this case
+# but has no dockerd equivalent.
+#
+# Tradeoff, accepted deliberately: this does let the real dockerd truncate a
+# real host log unseen. It is pinned to the moby libexec path under a systemd
+# parent, so a dropped binary calling itself dockerd does not inherit it.
+- macro: allowed_clear_log_files
+  condition: >
+    (container.id = host
+     and proc.name = dockerd
+     and proc.pname = systemd
+     and proc.exepath contains "/libexec/docker/dockerd")
+
+# FlareSolverr ships /app/chromedriver in its image; undetected_chromedriver
+# rewrites it in place at every startup to strip the `cdc_` Selenium tells,
+# which lands it in the container's upper layer and trips is_exe_upper_layer.
+# Verified 2026-09-13 by diffing the running binary against a fresh pull of the
+# image: 379 bytes differ, all contiguous at one offset inside the cdc_ string
+# block, size unchanged. That is a string patch, not injected code.
+#
+# Scoped to that one exepath rather than adding the image to
+# known_drop_and_execute_containers, so any OTHER dropped binary in this
+# container -- the case the rule exists for -- still alerts.
+- macro: known_drop_and_execute_activities
+  condition: >
+    (container.image.repository = "ghcr.io/flaresolverr/flaresolverr"
+     and proc.exepath = /app/chromedriver)

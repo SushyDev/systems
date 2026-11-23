@@ -6,11 +6,13 @@
 
   users.users.sushy = {
     isNormalUser = true;
+    # Headless box: user units must run without an active login session
+    linger = true;
     extraGroups = [
       "wheel"
       "docker"
       "media"
-      "kubernetes"
+      "k3s"
     ];
   };
 
@@ -21,5 +23,5 @@
   ];
 
   # Pre-set the KUBECONFIG environment variable for your shell
-  environment.variables.KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
+  environment.variables.KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
 }
