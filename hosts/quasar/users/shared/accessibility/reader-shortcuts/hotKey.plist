@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AccessibilityReaderHotkey</key>
+	<dict>
+		<key>AX_READER_HOTKEY_VIEW_IN_READER</key>
+		<dict>
+			<key>charCode</key>
+			<integer>65535</integer>
+			<key>keyCode</key>
+			<integer>53</integer>
+			<key>modifiers</key>
+			<integer>1048576</integer>
+		</dict>
+	</dict>
+</dict>
+</plist>

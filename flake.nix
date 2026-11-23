@@ -19,10 +19,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    sushy-lib = {
-      url = "github:sushydev/nix-lib";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
 
     sops-nix = {
       url = "git+https://github.com/Mic92/sops-nix";
@@ -53,8 +49,15 @@
     };
 
     nixos-sheng = {
-      url = "github:sushydev/nixos-sheng?ref=feature/update-kernel";
+      url = "github:sushydev/nixos-sheng?ref=feature/updates";
       inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Tracks upstream Claude Code releases directly (nixpkgs lags behind) and
+    # bundles its own node. nixpkgs is deliberately NOT followed here: the
+    # upstream cachix cache only has hits for the flake's own pinned nixpkgs.
+    claude-code = {
+      url = "github:sadjow/claude-code-nix";
     };
 
     dotfiles = {
@@ -65,142 +68,34 @@
       submodules = true;
     };
 
-    claude-lite = {
-      url = "path:/Users/work/Documents/Projects/claude-lite";
-    };
-
-    # claude-code ships several releases a week and the nixpkgs pin above is
-    # months behind it. Overlaid in modules/pulsar/home-manager.nix, so this
-    # tree supplies that one package and nothing else on the host moves.
-    nixpkgs-claude.url = "github:nixos/nixpkgs/nixos-unstable";
+    # claude-lite = {
+    #   url = "path:/Users/work/Documents/Projects/claude-lite";
+    # };
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      disko,
-      determinate,
-      home-manager,
-      plasma-manager,
       nix-darwin,
-      nix-plist-manager,
       nixos-sheng,
-      sops-nix,
       ...
     }@inputs:
     let
-      systemPc = {
-        system = "x86_64-linux";
-        specialArgs = {
-          inherit inputs;
-          setup = {
-            primaryUser = "sushy";
-            managedUsers = [ systemPc.specialArgs.setup.primaryUser ];
-            managedUsersAndRoot = [ "root" ] ++ systemPc.specialArgs.setup.managedUsers;
-            nixGroupMembers = [ systemPc.specialArgs.setup.primaryUser ];
-            nixGroupName = "nix";
-            nixGroupId = 101;
-            systemFlakePath = "/etc/nixos";
-          };
-        };
-        modules = [
-          determinate.nixosModules.default
-          ./modules/pc/configuration.nix
+      specialArgs = { inherit inputs; };
+      macPlatform = "aarch64-darwin";
 
-          home-manager.nixosModules.home-manager
-          ./modules/pc/home-manager.nix
-        ];
-      };
+      traitLib = import ./lib/traits { inherit (nixpkgs) lib; };
+      traits = import ./modules/traits { inherit (nixpkgs) lib; };
+      forEachSystem = nixpkgs.lib.genAttrs [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-linux"
+      ];
 
-      systemQuasar = {
-        system = "aarch64-darwin";
-        specialArgs = {
-          inherit inputs;
-          setup = {
-            managedUsers = [
-              "sushy"
-              "work"
-            ];
-            managedUsersAndRoot = systemQuasar.specialArgs.setup.managedUsers ++ [ "root" ];
-            nixGroupName = "nix";
-            nixGroupId = 503;
-            systemFlakePath = "/private/etc/nixdarwin";
-          };
-        };
-        modules = [
-          ./modules/quasar/configuration.nix
-
-          determinate.darwinModules.default
-          ./modules/quasar/determinate.nix
-
-          nix-plist-manager.darwinModules.default
-          ./modules/quasar/plist-manager.nix
-
-          home-manager.darwinModules.home-manager
-          ./modules/quasar/home-manager.nix
-        ];
-      };
-
-      systemPulsar = {
-        system = "x86_64-linux";
-        specialArgs = {
-          inherit inputs;
-          disko = disko;
-          setup = {
-            primaryUser = "sushy";
-            managedUsers = [ systemPulsar.specialArgs.setup.primaryUser ];
-            managedUsersAndRoot = [ "root" ] ++ systemPulsar.specialArgs.setup.managedUsers;
-            nixGroupMembers = [ systemPulsar.specialArgs.setup.primaryUser ];
-            nixGroupName = "nix";
-            nixGroupId = 502;
-            systemFlakePath = "/etc/nixos";
-          };
-        };
-        modules = [
-          determinate.nixosModules.default
-          disko.nixosModules.disko
-          ./modules/pulsar/disko/btrfs-raid1.nix
-
-          sops-nix.nixosModules.sops
-
-          ./modules/pulsar/configuration.nix
-
-          home-manager.nixosModules.home-manager
-          ./modules/pulsar/home-manager.nix
-        ];
-      };
-
-      # Xiaomi Pad 6S Pro. Built through nixos-sheng.lib.shengSystem rather
-      # than nixpkgs.lib.nixosSystem: that wrapper pins aarch64-linux, adds
-      # the sheng overlay (shengKernel, shengPackages), sets allowUnfree for
-      # the QTEE and firmware blobs, and imports nixos-sheng's own modules.
-      # It takes modules/specialArgs but not a whole nixosSystem attrset,
-      # which is why this one is not shaped like the three above.
-      systemSheng = {
-        modules = [
-          ./modules/sheng/configuration.nix
-
-          home-manager.nixosModules.home-manager
-          ./modules/sheng/home-manager.nix
-        ];
-        specialArgs = {
-          inherit inputs;
-          setup = {
-            primaryUser = "sushy";
-            managedUsers = [ systemSheng.specialArgs.setup.primaryUser ];
-            managedUsersAndRoot = [ "root" ] ++ systemSheng.specialArgs.setup.managedUsers;
-            nixGroupMembers = [ systemSheng.specialArgs.setup.primaryUser ];
-            nixGroupName = "nix";
-            nixGroupId = 101;
-            systemFlakePath = "/etc/nixos";
-          };
-        };
-      };
-
-      shengImageScript = nixpkgs.legacyPackages.${systemQuasar.system}.writeShellApplication {
+      shengImageScript = nixpkgs.legacyPackages.${macPlatform}.writeShellApplication {
         name = "sheng-image";
-        runtimeInputs = with nixpkgs.legacyPackages.${systemQuasar.system}; [
+        runtimeInputs = with nixpkgs.legacyPackages.${macPlatform}; [
           coreutils
           gnutar
         ];
@@ -208,10 +103,29 @@
       };
     in
     {
-      nixosConfigurations.pc = nixpkgs.lib.nixosSystem systemPc;
-      darwinConfigurations.quasar = nix-darwin.lib.darwinSystem systemQuasar;
-      nixosConfigurations.pulsar = nixpkgs.lib.nixosSystem systemPulsar;
-      nixosConfigurations.sheng = nixos-sheng.lib.shengSystem systemSheng;
+      nixosConfigurations = {
+        pc = nixpkgs.lib.nixosSystem {
+          inherit specialArgs;
+          modules = [ ./hosts/pc/configuration.nix ];
+        };
+
+        pulsar = nixpkgs.lib.nixosSystem {
+          inherit specialArgs;
+          modules = [ ./hosts/pulsar/configuration.nix ];
+        };
+
+        # Xiaomi Pad 6S Pro. shengSystem pins aarch64-linux, adds the sheng overlay,
+        # allows the unfree firmware blobs and imports nixos-sheng's own modules.
+        sheng = nixos-sheng.lib.shengSystem {
+          inherit specialArgs;
+          modules = [ ./hosts/sheng/configuration.nix ];
+        };
+      };
+
+      darwinConfigurations.quasar = nix-darwin.lib.darwinSystem {
+        inherit specialArgs;
+        modules = [ ./hosts/quasar/configuration.nix ];
+      };
 
       # The rootfs image itself. Only buildable on an aarch64-linux builder;
       # from this Mac use `nix run .#sheng`, which drives the container.
@@ -221,12 +135,34 @@
       # config, so it is re-exported rather than rebuilt here.
       packages.aarch64-linux.sheng-u-boot = nixos-sheng.packages.aarch64-linux.u-boot;
 
-      apps.${systemQuasar.system} = {
+      apps.${macPlatform} = {
         sheng = {
           type = "app";
           program = nixpkgs.lib.getExe shengImageScript;
         };
+        traits = traitLib.mkTraitsApp {
+          pkgs = nixpkgs.legacyPackages.${macPlatform};
+          configurations = self.nixosConfigurations // self.darwinConfigurations;
+        };
       }
-      // nixos-sheng.apps.${systemQuasar.system};
+      // nixos-sheng.apps.${macPlatform};
+
+      checks = forEachSystem (
+        system:
+        traitLib.mkChecks {
+          inherit traits specialArgs;
+          pkgs = nixpkgs.legacyPackages.${system};
+          nixos = {
+            evaluate = nixpkgs.lib.nixosSystem;
+            homeManager = traits.useHomeManager;
+            hostPlatform = "x86_64-linux";
+          };
+          darwin = {
+            evaluate = nix-darwin.lib.darwinSystem;
+            homeManager = traits.useHomeManager;
+            hostPlatform = macPlatform;
+          };
+        }
+      );
     };
 }

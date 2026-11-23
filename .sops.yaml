@@ -15,14 +15,14 @@
 #
 # Regenerate the host recipient after a reinstall with:
 #   ssh-to-age -i /etc/ssh/ssh_host_ed25519_key.pub
-# then `sops updatekeys modules/pulsar/secrets/pulsar.yaml`.
+# then `sops updatekeys hosts/pulsar/secrets/pulsar.yaml`.
 
 keys:
   - &admin age159kua8n7d34ha4p0wm50ugphanr7g095c76wyp87je42jgctpcpsv22d6v
   - &pulsar age16hsl25fhxhuxuulvltqjflpsjuk3gpxz5gw59ts2xqmqu6ptl4ks022vss
 
 creation_rules:
-  - path_regex: modules/pulsar/secrets/[^/]+\.yaml$
+  - path_regex: hosts/pulsar/secrets/[^/]+\.yaml$
     key_groups:
       - age:
           - *admin
