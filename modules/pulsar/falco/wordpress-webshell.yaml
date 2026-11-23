@@ -1,0 +1,220 @@
+# Falco rules for webshells in the WordPress uploads tree (lina-costea).
+#
+# Written 2026-11-20, the day linacostea.art was compromised, for a reason that
+# is uncomfortable: these rules are a near-copy of magento-webshell.yaml, which
+# has existed since 2026-09-19. The detection pattern was already written, and
+# already proven by two incidents. It was simply never extended to the second
+# PHP application on this host.
+#
+# WHAT HAPPENED, AND WHAT FALCO SAW
+#
+# An unauthenticated attacker chained CVE-2026-60137 and CVE-2026-63030
+# ("wp2shell") against WordPress 6.9.4, created an administrator account,
+# changed the owner's password, and uploaded ten PHP command-execution shells
+# into wp-content/uploads/2026/11/.
+#
+# Falco reported NOTHING. Not because it was broken -- it was healthy, its
+# ruleset loaded, and falcosidekick delivered to Discord normally two days
+# earlier -- but because no rule it had covered any of it:
+#
+#   - The intrusion itself was HTTP requests and SQL. No process spawned, no
+#     binary ran, no capability changed. There is no syscall to match, and no
+#     ruleset can fix that; that part is covered at the application layer now,
+#     by the mu-plugin in pulsar-gitops (apps/lina-costea/base/security.yaml).
+#   - The ten file writes WERE visible at the syscall layer. Rule 2 of
+#     magento-webshell.yaml is exactly the right shape for them. It is scoped
+#     to "/pub/media/", so it never looked at /wp-content/uploads/.
+#
+# THE NAMING LESSON, WHICH IS NOT THE SAME AS MAGENTO'S
+#
+# The dropped files were called:
+#
+#   w2sm887be7.php_.jpg   w2sm887be7.phtml_.jpg   w2sm887be7.pht_.jpg
+#   w2sm887be7.php5_.jpg  w2sm887be7.php7_.jpg    (and five more)
+#
+# The attacker uploaded "x.php", "x.phtml", "x.php5" and so on, and WordPress's
+# own sanitize_file_name() defanged each one by appending "_" and ".jpg". That
+# sanitising is the only reason this incident was not remote code execution:
+# Apache dispatches PHP on a trailing ".php", and none of these have one.
+#
+# It also means magento-webshell.yaml's `fd.name endswith ".php"` test would
+# have MISSED every single file. A suffix match sees ".jpg". So the conditions
+# below match a PHP handler token ANYWHERE in the name. That is deliberately
+# broader than the Magento rule and should stay that way: "inert because
+# WordPress renamed it" is not a control anyone chose, and the next upload
+# primitive may not pass through sanitize_file_name() at all.
+#
+# COVERAGE IS LAYERED, as in the Magento rules: catch the drop by name, catch
+# the drop by location, and catch execution by behaviour, so that evading one
+# rule is not enough.
+
+# The WordPress workload. Scoped by image rather than by pod, because
+# collectors.kubernetes.enabled is false (see falco.nix) and there are no pod
+# labels to match on -- only what the container engine knows.
+#
+# Both names are listed so the rules survive the planned retirement of the
+# hand-built core image: lina-wordpress-core is the current patched build, and
+# plain "wordpress" is the official image this goes back to after the WordPress
+# 7.x upgrade.
+- macro: wordpress_container
+  condition: >
+    (container.image.repository contains "lina-wordpress-core"
+     or container.image.repository endswith "/wordpress"
+     or container.image.repository = "wordpress")
+
+# Anything that names a PHP handler, at any position in the filename.
+#
+# ".pht" also covers ".phtml"; ".php" also covers ".php5", ".php7", ".phps" and
+# the "x.php_.jpg" sanitised form. Kept as a macro because three rules below
+# need the same test.
+- macro: php_handler_in_name
+  condition: >
+    (fd.name contains ".php"
+     or fd.name contains ".pht"
+     or fd.name contains ".phar")
+
+# The initContainers (seed-core, seed-content) populate the docroot and
+# wp-content with `cp` on every pod start, and that legitimately includes PHP
+# files -- WordPress core, the theme, mu-plugins and WooCommerce. Runtime writes
+# come from the Apache worker instead, so pinning these rules to apache2 as the
+# writer separates "the pod is starting" from "the running site is writing PHP",
+# with no exception list to keep in sync.
+- macro: wordpress_runtime_writer
+  condition: (proc.name in (apache2, httpd))
+
+########################################################################
+# 1. Execution -- the layer that does not care how the file got there
+########################################################################
+
+# The container runs mod_php inside Apache and nothing else: no cron (WP-Cron
+# arrives over HTTP), no WP-CLI, no maintenance scripts. The seed Job and the
+# daily audit run WP-CLI in their own pods, so nothing here needs a shell.
+#
+# The shells recovered on 2026-11-20 tried shell_exec, exec, system, passthru
+# and proc_open in turn. All five land here.
+- rule: Shell spawned by WordPress Apache
+  desc: >
+    A shell was executed with the WordPress Apache worker as its parent. The
+    serving process never does this; a webshell or an RCE payload does it
+    immediately.
+  condition: >
+    spawned_process
+    and wordpress_container
+    and proc.pname in (apache2, httpd)
+    and proc.name in (shell_binaries)
+  output: >
+    Shell spawned by WordPress Apache (shell=%proc.name cmd=%proc.cmdline
+    exe=%proc.exepath parent=%proc.pname user=%user.name uid=%user.uid
+    container=%container.name image=%container.image.repository
+    k8s_pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [wordpress, lina-costea, webshell, execution]
+
+# Same idea one step out: if the shell itself is ever whitelisted or evaded,
+# the recon binaries a payload runs first still surface.
+- rule: Recon binary executed under WordPress Apache
+  desc: >
+    A host-reconnaissance binary ran somewhere beneath the WordPress Apache
+    worker, which is what a webshell operator does before anything else.
+  condition: >
+    spawned_process
+    and wordpress_container
+    and proc.aname[2] in (apache2, httpd)
+    and proc.name in (id, hostname, whoami, uname, ifconfig, netstat, ss, curl, wget)
+  output: >
+    Reconnaissance binary executed under WordPress Apache (proc=%proc.name
+    cmd=%proc.cmdline parent=%proc.pname user=%user.name uid=%user.uid
+    container=%container.name image=%container.image.repository
+    k8s_pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [wordpress, lina-costea, webshell, discovery]
+
+########################################################################
+# 2. The drop -- a PHP-named file written anywhere under wp-content
+########################################################################
+
+# uploads/ is the only writable persistent path in the pod, so it is the only
+# place a dropped file survives a restart, and it is where all ten landed.
+# wp-content as a whole is covered rather than just uploads/ because a write
+# into themes/ or mu-plugins/ by the running site would be worse, not better --
+# see rule 3.
+#
+# This does not false-positive on normal use: the site's own writes under
+# uploads/ are JPEG/PNG artwork, their generated thumbnail sizes, and
+# WooCommerce's .log files.
+- rule: PHP file written into WordPress wp-content
+  desc: >
+    A file naming a PHP handler was written under wp-content by the running
+    site. Nothing WordPress does at runtime writes executable PHP there --
+    DISALLOW_FILE_MODS forbids the admin UI from trying. This is the
+    2026-11-20 incident's shape, including its "x.php_.jpg" sanitised form.
+  condition: >
+    open_write
+    and wordpress_container
+    and wordpress_runtime_writer
+    and fd.name contains "/wp-content/"
+    and php_handler_in_name
+  output: >
+    PHP file written into WordPress wp-content (file=%fd.name proc=%proc.name
+    cmd=%proc.cmdline user=%user.name uid=%user.uid container=%container.name
+    image=%container.image.repository k8s_pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [wordpress, lina-costea, webshell, filesystem]
+
+########################################################################
+# 3. Code appearing where only the image may write
+########################################################################
+
+# themes/, plugins/ and mu-plugins/ are an emptyDir rebuilt from the content
+# image by an initContainer on every start. After startup they are immutable in
+# practice, and DISALLOW_FILE_MODS plus DISALLOW_FILE_EDIT are set so the admin
+# UI cannot write there either.
+#
+# A runtime write therefore means one of those constants has been lost, or
+# something is executing with more privilege than the admin UI grants. Not
+# restricted to PHP names: a dropped .htaccess that re-enables a handler, or a
+# modified .js, matters just as much here.
+- rule: Runtime write into WordPress themes or plugins
+  desc: >
+    The running WordPress site wrote into themes/, plugins/ or mu-plugins/.
+    Those come from the content image and are read-only in practice; the admin
+    UI is forbidden from writing them by DISALLOW_FILE_MODS.
+  condition: >
+    open_write
+    and wordpress_container
+    and wordpress_runtime_writer
+    and (fd.name contains "/wp-content/themes/"
+      or fd.name contains "/wp-content/plugins/"
+      or fd.name contains "/wp-content/mu-plugins/")
+  output: >
+    Runtime write into WordPress themes or plugins (file=%fd.name
+    proc=%proc.name cmd=%proc.cmdline user=%user.name uid=%user.uid
+    container=%container.name image=%container.image.repository
+    k8s_pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [wordpress, lina-costea, webshell, filesystem]
+
+########################################################################
+# 4. Core being rewritten
+########################################################################
+
+# WordPress core is an emptyDir seeded from the pinned image and is never
+# updated in place -- automatic core updates cannot work here and a version
+# bump is an image rebuild. A write to wp-admin/ or wp-includes/ by the running
+# site is a backdoor being planted in core, which is where a persistent one
+# hides best.
+- rule: Runtime write into WordPress core
+  desc: >
+    The running WordPress site wrote into wp-admin/ or wp-includes/. Core is
+    seeded from a pinned image on pod start and is never modified afterwards.
+  condition: >
+    open_write
+    and wordpress_container
+    and wordpress_runtime_writer
+    and (fd.name contains "/wp-admin/" or fd.name contains "/wp-includes/")
+  output: >
+    Runtime write into WordPress core (file=%fd.name proc=%proc.name
+    cmd=%proc.cmdline user=%user.name uid=%user.uid container=%container.name
+    image=%container.image.repository k8s_pod=%k8s.pod.name)
+  priority: CRITICAL
+  tags: [wordpress, lina-costea, webshell, filesystem]

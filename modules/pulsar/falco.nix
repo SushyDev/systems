@@ -24,6 +24,8 @@ let
       ${pkgs.gnused}/bin/sed 's/^/    /' ${./falco/stylesmuggler.yaml}
       echo '  pulsar-magento-webshell.yaml: |'
       ${pkgs.gnused}/bin/sed 's/^/    /' ${./falco/magento-webshell.yaml}
+      echo '  pulsar-wordpress-webshell.yaml: |'
+      ${pkgs.gnused}/bin/sed 's/^/    /' ${./falco/wordpress-webshell.yaml}
     } > $out
   '';
 in
