@@ -35,7 +35,10 @@
 
   services.openssh = {
     enable = true;
+    # The leading newline matters: nix-darwin writes its HostKey lines without a
+    # trailing one, which otherwise swallows the first line here.
     extraConfig = ''
+
       PasswordAuthentication no
       KbdInteractiveAuthentication no
     '';
