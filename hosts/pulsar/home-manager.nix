@@ -18,6 +18,11 @@
 
     programs.git.enable = true;
 
+    # Same name and email as the other hosts. Not the signing key: its private
+    # half lives in 1Password on quasar, so commits made here are not signed.
+    imports = [ ../../modules/shared/user/git.nix ];
+    programs.git.signing.key = lib.mkForce null;
+
     # Claude Code remote control, driving the flake checkout
     systemd.user.services.claude-remote = {
       Unit = {

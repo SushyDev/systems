@@ -14,6 +14,7 @@ in
     ./determinate.nix
     ./home-manager.nix
     ./plist-manager.nix
+    ./wireguard.nix
   ]
   ++ (with traits; [
     (useGroupOwnedFlake {
@@ -60,7 +61,6 @@ in
     # # pkgs.google-chrome-canary
     # pkgs.setapp
 
-    # inputs.claude-lite.packages.${pkgs.stdenv.hostPlatform.system}.claude-lite
   ];
 
   fonts.packages = [

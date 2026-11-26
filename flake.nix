@@ -68,9 +68,8 @@
       submodules = true;
     };
 
-    # claude-lite = {
-    #   url = "path:/Users/work/Documents/Projects/claude-lite";
-    # };
+    # The Bentix development OS: its NixOS module, from its main checkout on pulsar.
+    devos.url = "git+file:///home/sushy/.local/share/bentix_devos/agents/checkouts/bentix_devos";
   };
 
   outputs =

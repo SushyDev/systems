@@ -69,8 +69,8 @@ in
   services.k3s.autoDeployCharts.falco = {
     repo = "https://falcosecurity.github.io/charts";
     name = "falco";
-    version = "9.1.0";
-    hash = "sha256-KnZ9auzPI5LF4mOuH14JUFIK/+OpkI/3mGrCE2ScRbQ=";
+    version = "9.2.2";
+    hash = "sha256-uKGqmEw9UTqxY5vnYOagep6yA9Tad6RaFRLTgrbTaH0=";
     targetNamespace = "falco";
     createNamespace = true;
 
