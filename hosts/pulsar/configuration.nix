@@ -28,6 +28,7 @@ in
     ./falco.nix
     ./devos.nix
     ./wireguard.nix
+    ./raid-alerts.nix
 
     ./system/default.nix
   ]
