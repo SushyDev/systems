@@ -35,4 +35,23 @@
   # traffic from quasar still goes through nixos-fw like any other, so only
   # what is open globally (ssh) is reachable over the tunnel.
   networking.firewall.allowedUDPPorts = [ 51820 ];
+
+  # `ssh quasar` over the tunnel, with quasar's host key pinned. The key file
+  # (~/.ssh/quasar_ed25519) is generated on pulsar and stays there; quasar
+  # accepts it only from 10.77.0.1.
+  programs.ssh.knownHosts.quasar = {
+    hostNames = [
+      "quasar"
+      "10.77.0.2"
+    ];
+    publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ+9VwA2DZkXIhEfqk1z9PHnE8gVnM33zfaknMrUWgEH";
+  };
+
+  programs.ssh.extraConfig = ''
+    Host quasar
+      HostName 10.77.0.2
+      User sushy
+      IdentityFile ~/.ssh/quasar_ed25519
+      IdentitiesOnly yes
+  '';
 }

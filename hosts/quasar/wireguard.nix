@@ -25,8 +25,14 @@
     ];
   };
 
-  # Remote Login (Apple's sshd), keys only. Which keys may log in is not set
-  # yet: no key is authorized until one is added deliberately.
+  # Remote Login (Apple's sshd), keys only.
+  #
+  # Pulsar logs in with its own key (~/.ssh/quasar_ed25519 there), accepted only
+  # from its tunnel address, so the key is useless anywhere but over wg0.
+  users.users.sushy.openssh.authorizedKeys.keys = [
+    ''from="10.77.0.1" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGgZJSGwIJXpRscME0+N16j62QxYE5HgHyatnvjfJWdi pulsar to quasar over WireGuard''
+  ];
+
   services.openssh = {
     enable = true;
     extraConfig = ''
