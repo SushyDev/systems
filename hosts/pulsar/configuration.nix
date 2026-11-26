@@ -26,6 +26,8 @@ in
     ./kubeops.nix
     ./flux.nix
     ./falco.nix
+    ./devos.nix
+    ./wireguard.nix
 
     ./system/default.nix
   ]

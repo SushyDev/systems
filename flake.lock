@@ -80,6 +80,21 @@
         "url": "https://install.determinate.systems/determinate-nixd/tag/v3.22.5/x86_64-linux"
       }
     },
+    "devos": {
+      "locked": {
+        "lastModified": 1795661324,
+        "narHash": "sha256-fwL0yruzlNlGq805JhnMDlO4AF2SUu6pE9lHs87YmR8=",
+        "ref": "refs/heads/main",
+        "rev": "b562bf6cc97cf44a3d2f1b555015751605258a18",
+        "revCount": 456,
+        "type": "git",
+        "url": "file:///home/sushy/.local/share/bentix_devos/agents/checkouts/bentix_devos"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///home/sushy/.local/share/bentix_devos/agents/checkouts/bentix_devos"
+      }
+    },
     "disko": {
       "inputs": {
         "nixpkgs": [
@@ -444,6 +459,7 @@
       "inputs": {
         "claude-code": "claude-code",
         "determinate": "determinate",
+        "devos": "devos",
         "disko": "disko",
         "dotfiles": "dotfiles",
         "home-manager": "home-manager",
@@ -463,11 +479,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1788914643,
-        "narHash": "sha256-4GuMPW90JSxXWDPUB9M+1m7fYbe3H0apOd86/zBQ2Kw=",
+        "lastModified": 1795471345,
+        "narHash": "sha256-2p8/wnENYHU2Z79Ir/rpq+V1sMI9mSD6xGAlvlbVBUY=",
         "ref": "refs/heads/master",
-        "rev": "13616fff713a9f94055c66f15687ebdc17a335df",
-        "revCount": 1240,
+        "rev": "d5abe5e53200ad48254e8e6bd95e6cef94e66577",
+        "revCount": 1273,
         "type": "git",
         "url": "https://github.com/Mic92/sops-nix"
       },
